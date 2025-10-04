@@ -74,11 +74,22 @@ function handleSendCode() {
     return;
   }
 
+  // 锁定检查
+  const lockUntil = getLockUntil(phone);
+  if (lockUntil && Date.now() < lockUntil) {
+    const left = Math.ceil((lockUntil - Date.now()) / 60000);
+    alert('该手机号已临时锁定，请 ' + left + ' 分钟后重试');
+    return;
+  }
+
   if (DEV_MODE) {
     const mockCode = generateMockCode();
-    localStorage.setItem('mockSmsCode:' + phone, mockCode);
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5分钟有效
+    setMockCode(phone, { code: mockCode, expiresAt });
+    resetAttempt(phone);
     devHint.style.display = 'block';
     alert('开发模式：验证码 ' + mockCode + ' 已生成（不会实际发送短信）');
+    startCooldown(sendCodeBtn, 60);
     return;
   }
 
@@ -112,11 +123,35 @@ function handlePhoneLogin() {
   }
 
   if (DEV_MODE) {
-    const ok = devFallbackPhoneLogin(phone, code);
-    if (!ok) {
-      alert('验证码错误或已过期');
+    const lockUntil = getLockUntil(phone);
+    if (lockUntil && Date.now() < lockUntil) {
+      const left = Math.ceil((lockUntil - Date.now()) / 60000);
+      alert('该手机号已临时锁定，请 ' + left + ' 分钟后重试');
       return;
     }
+
+    const store = getMockCode(phone);
+    if (!store) {
+      alert('请先发送验证码');
+      return;
+    }
+    if (Date.now() > store.expiresAt) {
+      alert('验证码已过期，请重新发送');
+      return;
+    }
+    if (store.code !== code) {
+      const attempts = incAttempt(phone);
+      if (attempts >= 3) {
+        setLockUntil(phone, Date.now() + 15 * 60 * 1000); // 错误3次锁定15分钟
+        alert('错误次数过多，已锁定 15 分钟');
+      } else {
+        alert('验证码错误，剩余可重试次数：' + (3 - attempts));
+      }
+      return;
+    }
+    // 验证成功
+    clearMockCode(phone);
+    resetAttempt(phone);
     const token = 'dev-' + Math.random().toString(36).slice(2);
     const user = {
       username: '用户' + phone.slice(-4),
@@ -162,7 +197,53 @@ function generateMockCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-function devFallbackPhoneLogin(phone, code) {
-  const stored = localStorage.getItem('mockSmsCode:' + phone);
-  return !!stored && stored === code;
+// 本地存储结构与工具函数
+function setMockCode(phone, payload) {
+  try {
+    localStorage.setItem('mockSms:' + phone, JSON.stringify(payload));
+  } catch {}
+}
+function getMockCode(phone) {
+  try {
+    const raw = localStorage.getItem('mockSms:' + phone);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function clearMockCode(phone) {
+  localStorage.removeItem('mockSms:' + phone);
+}
+function resetAttempt(phone) {
+  localStorage.setItem('mockSmsAttempt:' + phone, '0');
+}
+function incAttempt(phone) {
+  const v = parseInt(localStorage.getItem('mockSmsAttempt:' + phone) || '0', 10) + 1;
+  localStorage.setItem('mockSmsAttempt:' + phone, String(v));
+  return v;
+}
+function setLockUntil(phone, ts) {
+  localStorage.setItem('mockSmsLock:' + phone, String(ts));
+}
+function getLockUntil(phone) {
+  const v = parseInt(localStorage.getItem('mockSmsLock:' + phone) || '0', 10);
+  return v > 0 ? v : null;
+}
+
+// 发送按钮倒计时
+function startCooldown(btn, seconds) {
+  btn.disabled = true;
+  const original = btn.textContent;
+  let left = seconds;
+  btn.textContent = `重新发送(${left}s)`;
+  const timer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) {
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = original;
+    } else {
+      btn.textContent = `重新发送(${left}s)`;
+    }
+  }, 1000);
 }
