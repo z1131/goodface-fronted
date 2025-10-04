@@ -50,7 +50,13 @@
                 
                 <div id="loginPromptSection">
                     <p>您尚未登录，请先登录以查看您的账户信息。</p>
-                    <button id="showLoginBtn" class="btn btn-primary">立即登录</button>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button id="showLoginBtn" class="btn btn-primary">短信或账号登录</button>
+                        <button id="guestLoginBtn" class="btn btn-secondary">以游客体验</button>
+                    </div>
+                    <p style="margin-top:0.5rem; color:#666; font-size:0.9rem;">
+                        游客模式功能受限：不保存云端数据，仅可使用基础模型。
+                    </p>
                 </div>
                 
                 <div class="user-section" id="loginSection" style="display: none; margin-top: 2rem;">

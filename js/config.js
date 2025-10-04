@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // 检查用户登录状态
 function checkLoginStatus() {
     // 从localStorage获取用户信息
-    const user = JSON.parse(localStorage.getItem('interviewUser') || '{}');
+    const user = safeGetUser();
     
     if (user && user.token) {
         // 已登录，启用所有模型选项
@@ -393,7 +393,7 @@ function startInterview() {
     }
     
     // 检查是否选择了需要登录的模型但未登录
-    const user = JSON.parse(localStorage.getItem('interviewUser') || '{}');
+    const user = safeGetUser();
     if ((model === 'advanced' || model === 'premium') && (!user || !user.token)) {
         alert('该模型需要登录后才能使用，请先登录！');
         // 显示登录模态框
@@ -413,6 +413,18 @@ function startInterview() {
     
     // 跳转到面试页面
     window.location.href = 'interview.html';
+}
+
+// 安全读取用户信息，避免本地存储非 JSON 导致解析错误
+function safeGetUser() {
+    try {
+        const raw = localStorage.getItem('interviewUser');
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+        console.warn('本地用户信息损坏，已清空', e);
+        localStorage.removeItem('interviewUser');
+        return {};
+    }
 }
 
 // 暴露函数供调试使用

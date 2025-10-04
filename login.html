@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 面试助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #fff;
+            display: flex;
+            height: 100vh;
+        }
+        
+        .left-panel {
+            width: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #fff;
+        }
+        
+        .logo {
+            font-size: 200px;
+            font-weight: bold;
+            color: #000;
+            letter-spacing: -5px;
+        }
+        
+        .right-panel {
+            width: 50%;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background-color: #fff;
+        }
+        
+        .header {
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            color: #000;
+        }
+        
+        .header h2 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #000;
+        }
+        
+        .login-options {
+            margin-bottom: 40px;
+        }
+        
+        .phone-login, .guest-login, .create-account, .sign-in, .get-grok {
+            user-select: none;
+        }
+
+        .phone-login {
+            background-color: #fff;
+            border: 1px solid #ccd6dd;
+            border-radius: 30px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .phone-login:hover {
+            background-color: #f5f8fa;
+        }
+        
+        .phone-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .phone-login span {
+            font-size: 16px;
+            color: #000;
+        }
+        
+        .guest-login {
+            background-color: #fff;
+            border: 1px solid #ccd6dd;
+            border-radius: 30px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .guest-login:hover {
+            background-color: #f5f8fa;
+        }
+        
+        .guest-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .guest-login span {
+            font-size: 16px;
+            color: #000;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+        }
+        
+        .divider-line {
+            flex: 1;
+            height: 1px;
+            background-color: #ccd6dd;
+        }
+        
+        .divider-text {
+            margin: 0 15px;
+            font-size: 14px;
+            color: #657786;
+        }
+        
+        .create-account {
+            background-color: #000;
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .create-account:hover {
+            background-color: #1a1a1a;
+        }
+        
+        .terms {
+            font-size: 12px;
+            color: #657786;
+            margin-bottom: 30px;
+        }
+        
+        .terms a {
+            color: #1d9bf0;
+            text-decoration: none;
+        }
+        
+        .terms a:hover {
+            text-decoration: underline;
+        }
+        
+        .existing-account {
+            margin-top: 40px;
+        }
+        
+        .existing-account h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #000;
+        }
+        
+        .sign-in {
+            background-color: #fff;
+            border: 1px solid #ccd6dd;
+            border-radius: 30px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+        
+        .sign-in:hover {
+            background-color: #f5f8fa;
+        }
+        
+        .get-grok {
+            background-color: #fff;
+            border: 1px solid #ccd6dd;
+            border-radius: 30px;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .get-grok:hover {
+            background-color: #f5f8fa;
+        }
+        
+        .grok-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+        
+        /* 开发态手机号登录表单 */
+        .phone-form {
+            display: none;
+            margin-top: 20px;
+            border: 1px solid #e6ecf0;
+            border-radius: 16px;
+            padding: 20px;
+            background-color: #fafafa;
+        }
+        .phone-form .form-group {
+            margin-bottom: 12px;
+        }
+        .phone-form label {
+            font-size: 14px;
+            color: #555;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .phone-form input[type="tel"],
+        .phone-form input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccd6dd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .phone-form .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn {
+            padding: 10px 14px;
+            border-radius: 9999px;
+            border: 1px solid #ccd6dd;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #1d9bf0;
+            color: #fff;
+            border-color: #1d9bf0;
+        }
+        .btn-secondary {
+            background-color: #fff;
+            color: #000;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            
+            .left-panel, .right-panel {
+                width: 100%;
+                padding: 40px 20px;
+            }
+            
+            .logo {
+                font-size: 120px;
+            }
+            
+            .header h1 {
+                font-size: 36px;
+            }
+            
+            .header h2 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="left-panel">
+        <div class="logo">X</div>
+    </div>
+    
+    <div class="right-panel">
+        <div class="header">
+            <h1>Happening now</h1>
+            <h2>Join today.</h2>
+        </div>
+
+        <div class="login-options">
+            <div class="phone-login" id="phoneLoginTrigger">
+                <div class="phone-icon">📱</div>
+                <span>手机号登录</span>
+            </div>
+            
+            <div class="guest-login" id="guestLoginTrigger">
+                <div class="guest-icon">游客</div>
+                <span>访客登录</span>
+            </div>
+
+            <!-- 开发态手机号登录表单（不接入云服务） -->
+            <div class="phone-form" id="phoneForm">
+                <div class="form-group">
+                    <label for="phoneInput">手机号</label>
+                    <input type="tel" id="phoneInput" placeholder="请输入手机号">
+                </div>
+                <div class="form-group">
+                    <label for="codeInput">验证码</label>
+                    <input type="text" id="codeInput" placeholder="请输入6位验证码">
+                </div>
+                <div class="actions">
+                    <button class="btn btn-secondary" id="sendCodeBtn">发送验证码</button>
+                    <button class="btn btn-primary" id="loginByCodeBtn">登录</button>
+                </div>
+                <p id="devHint" style="margin-top:8px; font-size:12px; color:#657786; display:none;">
+                    开发模式：验证码已生成并显示在弹窗提示中。
+                </p>
+            </div>
+            
+            <div class="divider">
+                <div class="divider-line"></div>
+                <div class="divider-text">OR</div>
+                <div class="divider-line"></div>
+            </div>
+            
+            <button class="create-account" id="createAccountBtn">创建账户</button>
+            
+            <div class="terms">
+                By signing up, you agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>, including <a href="#">Cookie Use</a>.
+            </div>
+        </div>
+        
+        <div class="existing-account">
+            <h3>Already have an account?</h3>
+            <button class="sign-in" id="signInBtn">Sign in</button>
+            <button class="get-grok">
+                <span class="grok-icon">🌀</span>
+                Get Grok
+            </button>
+        </div>
+    </div>
+    <script src="js/login.js"></script>
+</body>
+</html>

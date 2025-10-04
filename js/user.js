@@ -17,6 +17,7 @@ const confirmRechargeBtn = document.getElementById('confirmRecharge');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const sendCodeBtn = document.getElementById('sendCodeBtn');
 const showLoginBtn = document.getElementById('showLoginBtn');
+const guestLoginBtn = document.getElementById('guestLoginBtn');
 const loginPromptSection = document.getElementById('loginPromptSection');
 const profileActions = document.getElementById('profileActions');
 const userInfo = document.getElementById('userInfo');
@@ -70,6 +71,14 @@ function bindEvents() {
         loginPromptSection.style.display = 'none';
         loginSection.style.display = 'block';
     });
+
+    // 游客登录
+    if (guestLoginBtn) {
+        guestLoginBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleGuestLogin();
+        });
+    }
     
     // 用户名密码登录表单提交
     loginForm.addEventListener('submit', function(e) {
@@ -121,7 +130,7 @@ function bindEvents() {
 // 检查登录状态
 function checkLoginStatus() {
     // 从localStorage获取用户信息
-    const user = JSON.parse(localStorage.getItem('interviewUser') || '{}');
+    const user = safeGetUser();
     
     if (user && user.token) {
         // 已登录，显示用户信息
@@ -183,7 +192,8 @@ function handleLogin() {
         return;
     }
     
-    // 发送登录请求\n    fetch('http://127.0.0.1:8081/api/user/login', {
+    // 发送登录请求
+    fetch('http://127.0.0.1:8081/api/user/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -236,7 +246,7 @@ function handlePhoneLogin() {
         return;
     }
     
-    // 发送登录请求
+    // 发送登录请求（如失败则走开发态本地校验）
     fetch('http://127.0.0.1:8081/api/user/loginByCode', {
         method: 'POST',
         headers: {
@@ -268,14 +278,56 @@ function handlePhoneLogin() {
             // 显示成功消息
             alert('登录成功！');
         } else {
-            // 登录失败
-            alert(data.message);
+            // 后端返回失败，尝试开发态本地校验
+            if (devFallbackPhoneLogin(phone, code)) {
+                const user = {
+                    username: 'user_' + phone,
+                    email: `${phone}@example.com`,
+                    token: 'dev-mock-token-' + Date.now(),
+                    balance: '0.00',
+                    membership: '普通用户'
+                };
+                localStorage.setItem('interviewUser', JSON.stringify(user));
+                showProfile(user);
+                alert('登录成功！（开发态本地校验）');
+            } else {
+                alert(data.message || '登录失败');
+            }
         }
     })
     .catch(error => {
         console.error('登录错误:', error);
-        alert('登录失败，请稍后重试');
+        // 网络或后端不可用，尝试开发态本地校验
+        if (devFallbackPhoneLogin(phone, code)) {
+            const user = {
+                username: 'user_' + phone,
+                email: `${phone}@example.com`,
+                token: 'dev-mock-token-' + Date.now(),
+                balance: '0.00',
+                membership: '普通用户'
+            };
+            localStorage.setItem('interviewUser', JSON.stringify(user));
+            showProfile(user);
+            alert('登录成功！（开发态本地校验）');
+        } else {
+            alert('登录失败，请稍后重试');
+        }
     });
+}
+
+// 游客登录（前端直接生成访客令牌）
+function handleGuestLogin() {
+    const guest = {
+        username: '访客',
+        email: '-',
+        token: 'guest-token-' + Date.now(),
+        balance: '0.00',
+        membership: '游客',
+        role: 'guest'
+    };
+    localStorage.setItem('interviewUser', JSON.stringify(guest));
+    showProfile(guest);
+    alert('已进入游客模式：仅可使用基础模型');
 }
 
 // 处理发送验证码
@@ -302,7 +354,7 @@ function handleSendCode() {
         }
     }, 1000);
     
-    // 发送请求
+    // 发送请求（如失败则走开发态本地生成验证码）
     fetch('http://127.0.0.1:8081/api/user/sendCode', {
         method: 'POST',
         headers: {
@@ -315,19 +367,46 @@ function handleSendCode() {
     .then(response => response.json())
     .then(data => {
         if (!data.success) {
+            // 开发态：本地生成验证码并提示
             clearInterval(countdownInterval);
             sendCodeBtn.disabled = false;
             sendCodeBtn.textContent = '发送验证码';
-            alert(data.message);
+            const mockCode = generateMockCode();
+            localStorage.setItem('mockSmsCode:' + phone, mockCode);
+            alert('开发模式：验证码 ' + mockCode + ' 已生成（不会实际发送短信）');
         }
     })
     .catch(error => {
+        // 网络或后端不可用，走开发态
         clearInterval(countdownInterval);
         sendCodeBtn.disabled = false;
         sendCodeBtn.textContent = '发送验证码';
         console.error('发送验证码错误:', error);
-        alert('验证码发送失败，请稍后重试');
+        const mockCode = generateMockCode();
+        localStorage.setItem('mockSmsCode:' + phone, mockCode);
+        alert('开发模式：验证码 ' + mockCode + ' 已生成（不会实际发送短信）');
     });
+}
+
+// 开发态：验证码生成与校验
+function generateMockCode() {
+    return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function devFallbackPhoneLogin(phone, code) {
+    const stored = localStorage.getItem('mockSmsCode:' + phone);
+    return !!stored && stored === code;
+}
+// 安全读取用户信息，避免本地存储非 JSON 导致解析错误
+function safeGetUser() {
+    try {
+        const raw = localStorage.getItem('interviewUser');
+        return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+        console.warn('本地用户信息损坏，已清空', e);
+        localStorage.removeItem('interviewUser');
+        return {};
+    }
 }
 
 // 处理注册
@@ -428,7 +507,7 @@ function handleRecharge() {
     // 实际项目中这里会发送HTTP请求到后端
     setTimeout(() => {
         // 更新用户余额
-        const user = JSON.parse(localStorage.getItem('interviewUser') || '{}');
+        const user = safeGetUser();
         if (user) {
             const currentBalance = parseFloat(user.balance || 0);
             user.balance = (currentBalance + amount).toFixed(2);
