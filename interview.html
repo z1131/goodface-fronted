@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>面试进行中 - 面试助手</title>
+    <link rel="stylesheet" href="css/interview.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>面试实时辅助助手</h1>
+            <nav>
+                <a href="config.html">面试配置</a>
+                <a href="interview.html" class="active">开始面试</a>
+                <a href="user.html">用户中心</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="interview-section">
+                <div class="qa-section">
+                    <div class="question-section">
+                        <h3>面试官问题</h3>
+                        <div id="questionDisplay" class="display-area">
+                            <p class="placeholder">等待面试官提问...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="answer-section">
+                        <h3>AI 回答</h3>
+                        <div id="answerDisplay" class="display-area">
+                            <p class="placeholder">AI回答将在此显示...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="interview-actions">
+                <button id="pauseInterview" class="btn btn-secondary">暂停面试</button>
+                <button id="endInterview" class="btn btn-secondary">结束面试</button>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2023 面试实时辅助助手. 保留所有权利.</p>
+        </footer>
+    </div>
+
+    <script src="js/interview.js"></script>
+</body>
+</html>

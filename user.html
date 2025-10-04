@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户中心 - 面试助手</title>
+    <link rel="stylesheet" href="css/user.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>面试实时辅助助手</h1>
+            <nav>
+                <a href="config.html">面试配置</a>
+                <a href="interview.html">开始面试</a>
+                <a href="user.html" class="active">用户中心</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="user-section" id="profileSection">
+                <h2>用户信息</h2>
+                <div class="profile-info" id="userInfo">
+                    <div class="info-item">
+                        <label>状态:</label>
+                        <span id="loginStatus">未登录</span>
+                    </div>
+                    <div class="info-item">
+                        <label>用户名:</label>
+                        <span id="profileUsername">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>邮箱:</label>
+                        <span id="profileEmail">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>账户余额:</label>
+                        <span id="accountBalance">¥0.00</span>
+                    </div>
+                    <div class="info-item">
+                        <label>会员等级:</label>
+                        <span id="membershipLevel">普通用户</span>
+                    </div>
+                </div>
+                
+                <div class="profile-actions" id="profileActions" style="display: none;">
+                    <button id="logoutBtn" class="btn btn-secondary">退出登录</button>
+                    <button id="rechargeBtn" class="btn btn-primary">充值</button>
+                </div>
+                
+                <div id="loginPromptSection">
+                    <p>您尚未登录，请先登录以查看您的账户信息。</p>
+                    <button id="showLoginBtn" class="btn btn-primary">立即登录</button>
+                </div>
+                
+                <div class="user-section" id="loginSection" style="display: none; margin-top: 2rem;">
+                    <h2>用户登录</h2>
+                    <div class="login-tabs">
+                        <button class="tab-btn active" data-tab="username">账号密码登录</button>
+                        <button class="tab-btn" data-tab="phone">手机验证码登录</button>
+                    </div>
+                    
+                    <!-- 账号密码登录表单 -->
+                    <form id="loginForm" class="login-form active">
+                        <div class="form-group">
+                            <label for="username">用户名</label>
+                            <input type="text" id="username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">密码</label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">登录</button>
+                    </form>
+                    
+                    <!-- 手机验证码登录表单 -->
+                    <form id="phoneLoginForm" class="login-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="phone">手机号</label>
+                            <input type="tel" id="phone" name="phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="code">验证码</label>
+                            <div class="code-input-group">
+                                <input type="text" id="code" name="code" required>
+                                <button type="button" id="sendCodeBtn" class="btn btn-secondary">发送验证码</button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">登录</button>
+                    </form>
+                    
+                    <div class="form-footer">
+                        <p>还没有账户？<a href="#" id="showRegister">立即注册</a></p>
+                    </div>
+                </div>
+
+                <div class="user-section" id="registerSection" style="display: none; margin-top: 2rem;">
+                    <h2>用户注册</h2>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="regUsername">用户名</label>
+                            <input type="text" id="regUsername" name="regUsername" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regEmail">邮箱</label>
+                            <input type="email" id="regEmail" name="regEmail" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regPassword">密码</label>
+                            <input type="password" id="regPassword" name="regPassword" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="regConfirmPassword">确认密码</label>
+                            <input type="password" id="regConfirmPassword" name="regConfirmPassword" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">注册</button>
+                    </form>
+                    <div class="form-footer">
+                        <p>已有账户？<a href="#" id="showLogin">立即登录</a></p>
+                    </div>
+                </div>
+                
+                <div class="recharge-section" id="rechargeSection" style="display: none; margin-top: 2rem;">
+                    <h3>账户充值</h3>
+                    <div class="recharge-options">
+                        <div class="recharge-option" data-amount="10">
+                            <span>¥10</span>
+                        </div>
+                        <div class="recharge-option" data-amount="30">
+                            <span>¥30</span>
+                        </div>
+                        <div class="recharge-option" data-amount="50">
+                            <span>¥50</span>
+                        </div>
+                        <div class="recharge-option" data-amount="100">
+                            <span>¥100</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="customAmount">自定义金额</label>
+                        <input type="number" id="customAmount" min="1" placeholder="输入充值金额">
+                    </div>
+                    <button id="confirmRecharge" class="btn btn-primary">确认充值</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2023 面试实时辅助助手. 保留所有权利.</p>
+        </footer>
+    </div>
+
+    <script src="js/user.js"></script>
+</body>
+</html>
