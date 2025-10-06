@@ -56,5 +56,19 @@
             <a href="user.html" class="btn">用户中心</a>
         </div>
     </div>
+
+    <script>
+        // 检查用户是否已登录
+        window.onload = function() {
+            // 这里应该检查实际的登录状态，目前我们用一个简单的检查来演示
+            // 在实际应用中，这可能涉及检查cookie、localStorage或向服务器验证
+            const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+            
+            if (!isLoggedIn) {
+                // 如果用户未登录，重定向到登录页面
+                window.location.href = 'login.html';
+            }
+        };
+    </script>
 </body>
 </html>

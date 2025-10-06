@@ -1,6 +1,7 @@
 // 独立登录页脚本（开发态支持游客与本地验证码登录）
 
-const DEV_MODE = true; // 开发阶段不接入云短信
+const DEV_MODE = false; // 开发阶段接入后端服务
+const BACKEND_BASE_URL = 'http://localhost:8080'; // 后端服务的基础URL
 
 // 元素绑定
 const phoneLoginTrigger = document.getElementById('phoneLoginTrigger');
@@ -11,7 +12,6 @@ const codeInput = document.getElementById('codeInput');
 const sendCodeBtn = document.getElementById('sendCodeBtn');
 const loginByCodeBtn = document.getElementById('loginByCodeBtn');
 const devHint = document.getElementById('devHint');
-const signInBtn = document.getElementById('signInBtn');
 const createAccountBtn = document.getElementById('createAccountBtn');
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,10 +41,6 @@ function bindEvents() {
   });
 
   // 导航到已有页面
-  signInBtn.addEventListener('click', () => {
-    // 这里指向已有的用户中心页以进行账号/短信登录
-    window.location.href = 'user.html';
-  });
   createAccountBtn.addEventListener('click', () => {
     // 跳转到用户中心页的注册表单
     window.location.href = 'user.html';
@@ -52,19 +48,46 @@ function bindEvents() {
 }
 
 function handleGuestLogin() {
-  const token = 'guest-' + Math.random().toString(36).slice(2);
-  const user = {
-    username: '游客',
-    email: 'guest@example.com',
-    token,
-    balance: '0.00',
-    membership: '普通用户',
-    capabilities: ['basic']
-  };
-  localStorage.setItem('interviewUser', JSON.stringify(user));
-  alert('已进入游客模式（功能受限）');
-  // 登录后跳转到用户中心或配置页
-  window.location.href = 'user.html';
+  if (DEV_MODE) {
+    const token = 'guest-' + Math.random().toString(36).slice(2);
+    const user = {
+      username: '游客',
+      email: 'guest@example.com',
+      token,
+      balance: '0.00',
+      membership: '普通用户',
+      capabilities: ['basic']
+    };
+    localStorage.setItem('interviewUser', JSON.stringify(user));
+    alert('已进入游客模式（功能受限）');
+    // 登录后跳转到面试配置页
+    window.location.href = 'config.html';
+    return;
+  }
+
+  // 真实后端登录
+  fetch(BACKEND_BASE_URL + '/api/user/guest/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }).then(r => r.json()).then(res => {
+    if (res.success) {
+      const user = {
+        username: res.username,
+        email: res.email,
+        token: res.token,
+        balance: res.balance,
+        membership: res.membership
+      };
+      localStorage.setItem('interviewUser', JSON.stringify(user));
+      alert('已进入游客模式（功能受限）');
+      window.location.href = 'config.html';
+    } else {
+      alert(res.message || '登录失败');
+    }
+  }).catch(err => {
+    console.error('登录错误:', err);
+    alert('登录失败，请稍后重试');
+  });
 }
 
 function handleSendCode() {
@@ -94,13 +117,19 @@ function handleSendCode() {
   }
 
   // 预留真实后端接入
-  fetch('http://127.0.0.1:8081/api/user/sendCode', {
+  fetch(BACKEND_BASE_URL + '/api/user/sms/code', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone })
   }).then(r => r.json()).then(res => {
     if (res.success) {
-      alert('验证码已发送');
+      // 生产环境不会返回code，这里仅用于开发模式
+      if (res.code) {
+        alert('开发模式：验证码 ' + res.code + ' 已生成（不会实际发送短信）');
+      } else {
+        alert('验证码已发送');
+      }
+      startCooldown(sendCodeBtn, 60);
     } else {
       alert(res.message || '发送失败');
     }
@@ -162,28 +191,27 @@ function handlePhoneLogin() {
     };
     localStorage.setItem('interviewUser', JSON.stringify(user));
     alert('登录成功！');
-    window.location.href = 'user.html';
+    window.location.href = 'config.html';
     return;
   }
 
   // 真实后端登录
-  fetch('http://127.0.0.1:8081/api/user/loginByCode', {
+  fetch(BACKEND_BASE_URL + '/api/user/loginByCode', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone, code })
   }).then(r => r.json()).then(res => {
     if (res.success) {
-      const d = res.data || {};
       const user = {
-        username: d.username || ('用户' + phone.slice(-4)),
-        email: d.email || ('user' + phone.slice(-4) + '@example.com'),
-        token: d.token,
-        balance: d.balance || '0.00',
-        membership: d.membership || '普通用户'
+        username: res.username || ('用户' + phone.slice(-4)),
+        email: res.email || ('user' + phone.slice(-4) + '@example.com'),
+        token: res.token,
+        balance: res.balance || '0.00',
+        membership: res.membership || '普通用户'
       };
       localStorage.setItem('interviewUser', JSON.stringify(user));
       alert('登录成功！');
-      window.location.href = 'user.html';
+      window.location.href = 'config.html';
     } else {
       alert(res.message || '登录失败');
     }
