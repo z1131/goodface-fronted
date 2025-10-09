@@ -5,6 +5,7 @@ const pauseInterviewBtn = document.getElementById('pauseInterview');
 const endInterviewBtn = document.getElementById('endInterview');
 const questionDisplay = document.getElementById('questionDisplay');
 const answerDisplay = document.getElementById('answerDisplay');
+let answerStarted = false; // 是否已开始接收答案流
 
 // 音频相关变量
 let mediaRecorder; // 不再使用，但保留变量以兼容旧逻辑
@@ -93,13 +94,13 @@ function initWebSocket() {
                 displayQuestion(data.content);
             } else if (data.type === 'answer') {
                 if (data.content === '[END]') {
-                    // 答案结束标记
-                    answerDisplay.innerHTML += '<p style="color: #27ae60;">[回答结束]</p>';
-                } else {
-                    // 流式显示答案
-                    answerDisplay.innerHTML += data.content;
-                    // 滚动到最新内容
-                    answerDisplay.scrollTop = answerDisplay.scrollHeight;
+                    const endTag = document.createElement('p');
+                    endTag.style.color = '#27ae60';
+                    endTag.textContent = '[回答结束]';
+                    answerDisplay.appendChild(endTag);
+                    answerStarted = false;
+                } else if (typeof data.content === 'string' && data.content.length > 0) {
+                    appendAnswerChunk(data.content);
                 }
             }
         } catch (e) {
@@ -207,6 +208,24 @@ function displayAnswer(answer) {
     }
     // 滚动到最新内容
     answerDisplay.scrollTop = answerDisplay.scrollHeight;
+}
+
+// 追加答案增量片段：移除占位符，按文本节点追加，更稳定
+function appendAnswerChunk(text) {
+    try {
+        if (!answerStarted) {
+            // 清空占位符
+            answerDisplay.innerHTML = '';
+            answerStarted = true;
+        }
+        const span = document.createElement('span');
+        span.textContent = text;
+        answerDisplay.appendChild(span);
+        // 自动滚动到最新
+        answerDisplay.scrollTop = answerDisplay.scrollHeight;
+    } catch (e) {
+        console.error('追加答案片段失败:', e);
+    }
 }
 
 // 结束面试
