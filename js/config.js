@@ -408,11 +408,41 @@ function startInterview() {
         position: position,
         timestamp: new Date().toISOString()
     };
-    
     localStorage.setItem('interviewConfig', JSON.stringify(config));
-    
-    // 跳转到面试页面
-    window.location.href = 'interview.html';
+
+    // 通过portal创建会话并获取wsUrl
+    fetch('http://127.0.0.1:8001/api/interview/session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ config })
+    })
+    .then(resp => resp.json())
+    .then(result => {
+        if (result && result.code === 200 && result.data && result.data.wsUrl) {
+            localStorage.setItem('interviewSession', JSON.stringify(result.data));
+            window.location.href = 'interview.html';
+        } else {
+            console.warn('会话创建失败，使用本地兜底:', result);
+            const fallback = {
+                sessionId: 'sess_' + Date.now(),
+                wsUrl: 'ws://127.0.0.1:8003/audio/stream?sessionId=' + ('sess_' + Date.now())
+            };
+            localStorage.setItem('interviewSession', JSON.stringify(fallback));
+            window.location.href = 'interview.html';
+        }
+    })
+    .catch(err => {
+        console.warn('会话创建异常，使用本地兜底:', err);
+        const fallbackId = 'sess_' + Date.now();
+        const fallback = {
+            sessionId: fallbackId,
+            wsUrl: 'ws://127.0.0.1:8003/audio/stream?sessionId=' + fallbackId
+        };
+        localStorage.setItem('interviewSession', JSON.stringify(fallback));
+        window.location.href = 'interview.html';
+    });
 }
 
 // 安全读取用户信息，避免本地存储非 JSON 导致解析错误
