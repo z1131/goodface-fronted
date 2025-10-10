@@ -5,7 +5,9 @@ const pauseInterviewBtn = document.getElementById('pauseInterview');
 const endInterviewBtn = document.getElementById('endInterview');
 const questionDisplay = document.getElementById('questionDisplay');
 const answerDisplay = document.getElementById('answerDisplay');
+const timerDisplay = document.getElementById('interviewTimer');
 let answerStarted = false; // 是否已开始接收答案流
+let answerBuffer = ""; // 累积答案文本用于 Markdown 渲染
 
 // 音频相关变量
 let mediaRecorder; // 不再使用，但保留变量以兼容旧逻辑
@@ -19,6 +21,74 @@ let processorNode; // 处理节点（ScriptProcessor）
 let sttReady = false; // 收到后端就绪信号后才发送音频
 let recordingStarted = false; // 避免重复启动录音
 
+// 计时器相关变量
+let timerInterval = null;
+let elapsedMs = 0;
+let timerRunning = false;
+
+function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const ss = String(totalSec % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+}
+
+function updateTimerDisplay() {
+    if (timerDisplay) timerDisplay.textContent = formatTime(elapsedMs);
+}
+
+function startTimer() {
+    if (timerRunning) return;
+    timerRunning = true;
+    const base = Date.now() - elapsedMs;
+    timerInterval = setInterval(() => {
+        elapsedMs = Date.now() - base;
+        updateTimerDisplay();
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    timerRunning = false;
+}
+
+// 简易 Markdown 渲染（常用子集）：代码块、行内代码、标题、加粗、斜体、链接、列表与段落
+function renderMarkdown(text) {
+    const esc = (s) => s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+    let t = String(text || '');
+    // ```code```
+    t = t.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${esc(code)}</code></pre>`);
+    // `code`
+    t = t.replace(/`([^`]+)`/g, (_, code) => `<code>${esc(code)}</code>`);
+    // Headings
+    t = t.replace(/^######\s*(.*)$/gm, '<h6>$1</h6>')
+         .replace(/^#####\s*(.*)$/gm, '<h5>$1</h5>')
+         .replace(/^####\s*(.*)$/gm, '<h4>$1</h4>')
+         .replace(/^###\s*(.*)$/gm, '<h3>$1</h3>')
+         .replace(/^##\s*(.*)$/gm, '<h2>$1</h2>')
+         .replace(/^#\s*(.*)$/gm, '<h1>$1</h1>');
+    // Bold / Italic
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // Links
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Bullet list
+    t = t.replace(/^(?:- |\* )(.*(?:\n(?:- |\* ).*)*)$/gm, (m) => {
+        const items = m.split(/\n/).map(l => l.replace(/^(?:- |\* )/, '').trim()).map(i => `<li>${i}</li>`).join('');
+        return `<ul>${items}</ul>`;
+    });
+    // Paragraphs & line breaks（避免破坏已生成的块级标签）
+    t = t.split(/\n\n+/).map(block => {
+        // 以<开头的认为已是块级，直接透传；否则包裹为<p>
+        if (/^\s*</.test(block)) return block.replace(/\n/g, '<br>');
+        return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+    return t;
+}
+
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
     // 绑定事件
@@ -26,6 +96,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化WebSocket连接
     initWebSocket();
+
+    // 启动计时器
+    updateTimerDisplay();
+    startTimer();
 });
 
 // 绑定事件
@@ -99,6 +173,7 @@ function initWebSocket() {
                     endTag.textContent = '[回答结束]';
                     answerDisplay.appendChild(endTag);
                     answerStarted = false;
+                    // 保持最终内容已渲染，无需追加操作
                 } else if (typeof data.content === 'string' && data.content.length > 0) {
                     appendAnswerChunk(data.content);
                 }
@@ -181,6 +256,8 @@ function togglePause() {
         if (mediaStream) {
             mediaStream.getTracks().forEach(track => track.enabled = false);
         }
+        // 暂停计时
+        stopTimer();
         pauseInterviewBtn.textContent = '恢复面试';
         console.log('面试已暂停');
     } else {
@@ -188,6 +265,8 @@ function togglePause() {
         if (mediaStream) {
             mediaStream.getTracks().forEach(track => track.enabled = true);
         }
+        // 继续计时
+        startTimer();
         pauseInterviewBtn.textContent = '暂停面试';
         console.log('面试已恢复');
     }
@@ -200,12 +279,10 @@ function displayQuestion(question) {
 
 // 显示回答
 function displayAnswer(answer) {
-    // 如果是新答案，清空之前的答案
-    if (!answerDisplay.innerHTML.includes(answer)) {
-        answerDisplay.innerHTML = `<p>${answer}</p>`;
-    } else {
-        answerDisplay.innerHTML += answer;
-    }
+    // 统一走 Markdown 渲染（如库不可用则回退纯文本）
+    answerStarted = true;
+    answerBuffer = answer || '';
+    answerDisplay.innerHTML = renderMarkdown(answerBuffer);
     // 滚动到最新内容
     answerDisplay.scrollTop = answerDisplay.scrollHeight;
 }
@@ -217,10 +294,11 @@ function appendAnswerChunk(text) {
             // 清空占位符
             answerDisplay.innerHTML = '';
             answerStarted = true;
+            answerBuffer = '';
         }
-        const span = document.createElement('span');
-        span.textContent = text;
-        answerDisplay.appendChild(span);
+        // 累积文本并用 Markdown 渲染，若库不可用则回退追加纯文本
+        answerBuffer += text;
+        answerDisplay.innerHTML = renderMarkdown(answerBuffer);
         // 自动滚动到最新
         answerDisplay.scrollTop = answerDisplay.scrollHeight;
     } catch (e) {
@@ -247,6 +325,8 @@ function endInterview() {
     if (webSocket) {
         webSocket.close();
     }
+    // 停止计时
+    stopTimer();
     
     // 确认是否结束面试
     if (confirm('确定要结束本次面试吗？')) {

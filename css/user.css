@@ -16,6 +16,8 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 20px;
+    /* 预留底部固定导航空间，避免遮挡内容 */
+    padding-bottom: 60px;
 }
 
 header {
@@ -29,6 +31,19 @@ header h1 {
     text-align: center;
     color: #2c3e50;
     margin-bottom: 1rem;
+}
+
+/* 紧凑登录提示，仅按钮 */
+.login-prompt {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0.5rem 0 1rem;
+}
+
+.btn-compact {
+    font-size: 12px;
+    padding: 0.25rem 0.5rem;
 }
 
 nav {
@@ -238,6 +253,53 @@ footer {
     color: #7f8c8d;
     border-top: 1px solid #eee;
     margin-top: 2rem;
+}
+
+/* 底部微信风格导航（与 config 页面一致） */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background-color: #fff;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+}
+
+.bottom-nav .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #7f8c8d;
+    height: 100%;
+    min-width: 80px;
+}
+
+.bottom-nav .icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.bottom-nav .label {
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.bottom-nav .nav-item.active .icon,
+.bottom-nav .nav-item.active .label {
+    color: #3498db;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding-bottom: 60px;
+    }
 }
 
 /* 登录标签样式 */

@@ -21,6 +21,11 @@ const guestLoginBtn = document.getElementById('guestLoginBtn');
 const loginPromptSection = document.getElementById('loginPromptSection');
 const profileActions = document.getElementById('profileActions');
 const userInfo = document.getElementById('userInfo');
+// 用户页登录模态相关元素
+const userLoginModal = document.getElementById('userLoginModal');
+const uModalPhoneLoginForm = document.getElementById('uModalPhoneLoginForm');
+const uModalSendCodeBtn = document.getElementById('uModalSendCodeBtn');
+const userModalCloseBtns = document.querySelectorAll('#userLoginModal .close');
 
 // 检查用户登录状态
 document.addEventListener('DOMContentLoaded', function() {
@@ -40,37 +45,58 @@ function bindEvents() {
             this.classList.add('active');
             
             if (tab === 'username') {
-                loginForm.classList.add('active');
-                phoneLoginForm.style.display = 'none';
-                loginForm.style.display = 'block';
+                if (loginForm) {
+                    loginForm.classList.add('active');
+                    loginForm.style.display = 'block';
+                }
+                if (phoneLoginForm) {
+                    phoneLoginForm.style.display = 'none';
+                }
             } else {
-                phoneLoginForm.style.display = 'block';
-                loginForm.classList.remove('active');
-                loginForm.style.display = 'none';
+                if (phoneLoginForm) {
+                    phoneLoginForm.style.display = 'block';
+                }
+                if (loginForm) {
+                    loginForm.classList.remove('active');
+                    loginForm.style.display = 'none';
+                }
             }
         });
     });
     
     // 显示注册表单
-    showRegisterLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        loginSection.style.display = 'none';
-        registerSection.style.display = 'block';
-    });
+    if (showRegisterLink && loginSection && registerSection) {
+        showRegisterLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            loginSection.style.display = 'none';
+            registerSection.style.display = 'block';
+        });
+    }
     
     // 显示登录表单
-    showLoginLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        registerSection.style.display = 'none';
-        loginSection.style.display = 'block';
-    });
+    if (showLoginLink && loginSection && registerSection) {
+        showLoginLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            registerSection.style.display = 'none';
+            loginSection.style.display = 'block';
+        });
+    }
     
     // 显示登录表单（从提示区域）
-    showLoginBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        loginPromptSection.style.display = 'none';
-        loginSection.style.display = 'block';
-    });
+    if (showLoginBtn) {
+        showLoginBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // 默认弹出手机号登录模态而非内嵌表单
+            const modal = document.getElementById('userLoginModal');
+            if (modal) {
+                modal.style.display = 'block';
+            } else {
+                // 兜底：显示内嵌登录表单（如果存在）
+                if (loginPromptSection) loginPromptSection.style.display = 'none';
+                if (loginSection) loginSection.style.display = 'block';
+            }
+        });
+    }
 
     // 游客登录
     if (guestLoginBtn) {
@@ -81,50 +107,93 @@ function bindEvents() {
     }
     
     // 用户名密码登录表单提交
-    loginForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleLogin();
-    });
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleLogin();
+        });
+    }
     
     // 手机号验证码登录表单提交
-    phoneLoginForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handlePhoneLogin();
-    });
+    if (phoneLoginForm) {
+        phoneLoginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handlePhoneLogin();
+        });
+    }
     
     // 发送验证码
-    sendCodeBtn.addEventListener('click', function() {
-        handleSendCode();
-    });
+    if (sendCodeBtn) {
+        sendCodeBtn.addEventListener('click', function() {
+            handleSendCode();
+        });
+    }
     
     // 注册表单提交
-    registerForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleRegister();
-    });
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleRegister();
+        });
+    }
     
     // 退出登录
-    logoutBtn.addEventListener('click', function() {
-        handleLogout();
-    });
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function() {
+            handleLogout();
+        });
+    }
     
     // 显示充值区域
-    rechargeBtn.addEventListener('click', function() {
-        rechargeSection.style.display = rechargeSection.style.display === 'none' ? 'block' : 'none';
-    });
+    if (rechargeBtn && rechargeSection) {
+        rechargeBtn.addEventListener('click', function() {
+            rechargeSection.style.display = rechargeSection.style.display === 'none' ? 'block' : 'none';
+        });
+    }
     
     // 充值选项选择
-    rechargeOptions.forEach(option => {
-        option.addEventListener('click', function() {
-            rechargeOptions.forEach(opt => opt.classList.remove('selected'));
-            this.classList.add('selected');
+    if (rechargeOptions && rechargeOptions.length) {
+        rechargeOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                rechargeOptions.forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
         });
-    });
+    }
     
     // 确认充值
-    confirmRechargeBtn.addEventListener('click', function() {
-        handleRecharge();
-    });
+    if (confirmRechargeBtn) {
+        confirmRechargeBtn.addEventListener('click', function() {
+            handleRecharge();
+        });
+    }
+
+    // 用户页模态：提交、关闭、发送验证码
+    if (userLoginModal) {
+        // 点击遮罩关闭
+        window.addEventListener('click', function(event) {
+            if (event.target === userLoginModal) {
+                userLoginModal.style.display = 'none';
+            }
+        });
+        // 关闭按钮
+        userModalCloseBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                userLoginModal.style.display = 'none';
+            });
+        });
+    }
+    if (uModalPhoneLoginForm) {
+        uModalPhoneLoginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handlePhoneLogin();
+        });
+    }
+    if (uModalSendCodeBtn) {
+        uModalSendCodeBtn.addEventListener('click', function() {
+            handleSendCode();
+        });
+    }
 }
 
 // 检查登录状态
@@ -135,8 +204,10 @@ function checkLoginStatus() {
     if (user && user.token) {
         // 已登录，显示用户信息
         showProfile(user);
+        // 隐藏登录模态（如存在）
+        if (userLoginModal) userLoginModal.style.display = 'none';
     } else {
-        // 未登录，显示登录提示
+        // 未登录，仅显示“立即登录”按钮，登录窗口不自动展开
         showLoginPrompt();
     }
 }
@@ -144,14 +215,12 @@ function checkLoginStatus() {
 // 显示登录提示
 function showLoginPrompt() {
     // 隐藏用户信息区域的操作按钮
-    profileActions.style.display = 'none';
+    if (profileActions) profileActions.style.display = 'none';
     
-    // 显示登录提示区域
-    loginPromptSection.style.display = 'block';
-    
-    // 隐藏登录和注册表单
-    loginSection.style.display = 'none';
-    registerSection.style.display = 'none';
+    // 仅显示登录提示按钮
+    if (loginPromptSection) loginPromptSection.style.display = 'block';
+    if (loginSection) loginSection.style.display = 'none';
+    if (registerSection) registerSection.style.display = 'none';
     
     // 更新用户信息为未登录状态
     document.getElementById('loginStatus').textContent = '未登录';
@@ -164,14 +233,14 @@ function showLoginPrompt() {
 // 显示用户信息
 function showProfile(user) {
     // 隐藏登录提示区域
-    loginPromptSection.style.display = 'none';
+    if (loginPromptSection) loginPromptSection.style.display = 'none';
     
     // 显示用户信息区域的操作按钮
-    profileActions.style.display = 'flex';
+    if (profileActions) profileActions.style.display = 'flex';
     
     // 隐藏登录和注册表单
-    loginSection.style.display = 'none';
-    registerSection.style.display = 'none';
+    if (loginSection) loginSection.style.display = 'none';
+    if (registerSection) registerSection.style.display = 'none';
     
     // 更新用户信息
     document.getElementById('loginStatus').textContent = '已登录';
@@ -223,6 +292,7 @@ function handleLogin() {
             showProfile(user);
             
             // 显示成功消息
+            if (userLoginModal) userLoginModal.style.display = 'none';
             alert('登录成功！');
         } else {
             // 登录失败
@@ -237,8 +307,10 @@ function handleLogin() {
 
 // 处理手机号验证码登录
 function handlePhoneLogin() {
-    const phone = document.getElementById('phone').value;
-    const code = document.getElementById('code').value;
+    const phoneInput = document.getElementById('uModalPhone') || document.getElementById('phone');
+    const codeInput = document.getElementById('uModalCode') || document.getElementById('code');
+    const phone = phoneInput ? phoneInput.value : '';
+    const code = codeInput ? codeInput.value : '';
     
     // 简单验证
     if (!phone || !code) {
@@ -289,6 +361,7 @@ function handlePhoneLogin() {
                 };
                 localStorage.setItem('interviewUser', JSON.stringify(user));
                 showProfile(user);
+                if (userLoginModal) userLoginModal.style.display = 'none';
                 alert('登录成功！（开发态本地校验）');
             } else {
                 alert(data.message || '登录失败');
@@ -308,6 +381,7 @@ function handlePhoneLogin() {
             };
             localStorage.setItem('interviewUser', JSON.stringify(user));
             showProfile(user);
+            if (userLoginModal) userLoginModal.style.display = 'none';
             alert('登录成功！（开发态本地校验）');
         } else {
             alert('登录失败，请稍后重试');
@@ -332,25 +406,31 @@ function handleGuestLogin() {
 
 // 处理发送验证码
 function handleSendCode() {
-    const phone = document.getElementById('phone').value;
+    const phoneInput = document.getElementById('uModalPhone') || document.getElementById('phone');
+    const phone = phoneInput ? phoneInput.value : '';
     
     if (!phone) {
         alert('请输入手机号');
         return;
     }
     
-    // 禁用按钮并显示倒计时
-    sendCodeBtn.disabled = true;
+    // 禁用按钮并显示倒计时（优先模态按钮）
+    const targetBtn = document.getElementById('uModalSendCodeBtn') || sendCodeBtn;
+    if (!targetBtn) {
+        alert('无法找到发送验证码按钮');
+        return;
+    }
+    targetBtn.disabled = true;
     let countdown = 60;
-    sendCodeBtn.textContent = `${countdown}秒后重发`;
+    targetBtn.textContent = `${countdown}秒后重发`;
     
     const countdownInterval = setInterval(() => {
         countdown--;
-        sendCodeBtn.textContent = `${countdown}秒后重发`;
+        targetBtn.textContent = `${countdown}秒后重发`;
         if (countdown <= 0) {
             clearInterval(countdownInterval);
-            sendCodeBtn.disabled = false;
-            sendCodeBtn.textContent = '发送验证码';
+            targetBtn.disabled = false;
+            targetBtn.textContent = '发送验证码';
         }
     }, 1000);
     
@@ -369,8 +449,8 @@ function handleSendCode() {
         if (!data.success) {
             // 开发态：本地生成验证码并提示
             clearInterval(countdownInterval);
-            sendCodeBtn.disabled = false;
-            sendCodeBtn.textContent = '发送验证码';
+            targetBtn.disabled = false;
+            targetBtn.textContent = '发送验证码';
             const mockCode = generateMockCode();
             localStorage.setItem('mockSmsCode:' + phone, mockCode);
             alert('开发模式：验证码 ' + mockCode + ' 已生成（不会实际发送短信）');
@@ -379,8 +459,8 @@ function handleSendCode() {
     .catch(error => {
         // 网络或后端不可用，走开发态
         clearInterval(countdownInterval);
-        sendCodeBtn.disabled = false;
-        sendCodeBtn.textContent = '发送验证码';
+        targetBtn.disabled = false;
+        targetBtn.textContent = '发送验证码';
         console.error('发送验证码错误:', error);
         const mockCode = generateMockCode();
         localStorage.setItem('mockSmsCode:' + phone, mockCode);

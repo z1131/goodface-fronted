@@ -88,10 +88,10 @@
 
 .modal .form-group input {
     width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
+    padding: 10px 12px;
+    border: 1px solid #ccd6dd;
+    border-radius: 8px;
+    font-size: 14px;
     box-sizing: border-box;
 }
 
@@ -115,20 +115,23 @@
     padding: 0.75rem 1rem;
 }
 
+/* 按钮采用 login 页面类似的圆角胶囊风格 */
 .modal .btn {
     display: inline-block;
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 4px;
-    font-size: 1rem;
+    padding: 10px 14px;
+    border-radius: 9999px;
+    border: 1px solid #ccd6dd;
+    background-color: #fff;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s ease;
     text-align: center;
+    font-size: 14px;
 }
 
 .modal .btn-primary {
-    background-color: #3498db;
-    color: white;
+    background-color: #1d9bf0;
+    color: #fff;
+    border-color: #1d9bf0;
 }
 
 .modal .btn-primary:hover {
@@ -136,8 +139,8 @@
 }
 
 .modal .btn-secondary {
-    background-color: #95a5a6;
-    color: white;
+    background-color: #fff;
+    color: #000;
 }
 
 .modal .btn-secondary:hover {
@@ -148,6 +151,18 @@
     display: block;
     width: 100%;
 }
+
+/* phone-form 外观对齐 login 页面 */
+.modal .phone-form {
+    margin-top: 12px;
+    border: 1px solid #e6ecf0;
+    border-radius: 16px;
+    padding: 16px;
+    background-color: #fafafa;
+}
+.modal .phone-form .form-group { margin-bottom: 12px; }
+.modal .phone-form label { font-size: 14px; color: #555; margin-bottom: 6px; display:block; }
+.modal .phone-form .actions { display:flex; gap:8px; margin-top:8px; }
 
 .modal .form-footer {
     text-align: center;

@@ -119,6 +119,17 @@ main {
     overflow-y: auto;
 }
 
+/* 调整问题与回答区域的高度分配：缩短问题区，增大回答区 */
+.question-section .display-area {
+    min-height: 100px;
+    max-height: 140px;
+}
+
+.answer-section .display-area {
+    min-height: 260px;
+    max-height: 420px;
+}
+
 .display-area .placeholder {
     color: #7f8c8d;
     font-style: italic;
@@ -128,6 +139,14 @@ main {
 
 .interview-actions {
     text-align: center;
+}
+
+.timer-display {
+    display: inline-block;
+    margin-left: 1rem;
+    font-weight: bold;
+    color: #2c3e50;
+    letter-spacing: 0.5px;
 }
 
 footer {

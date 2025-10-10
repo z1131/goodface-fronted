@@ -20,10 +20,10 @@ const loginModalContent = document.querySelector('.modal-content:not(#registerMo
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
     // 检查用户登录状态
-    checkLoginStatus();
+    try { checkLoginStatus(); } catch (e) { console.warn('checkLoginStatus执行异常', e); }
     
     // 绑定事件
-    bindEvents();
+    try { bindEvents(); } catch (e) { console.warn('bindEvents执行异常', e); }
 });
 
 // 检查用户登录状态
@@ -35,10 +35,10 @@ function checkLoginStatus() {
         // 已登录，启用所有模型选项
         enableAllModels();
         // 隐藏登录提示
-        loginPrompt.style.display = 'none';
+        if (loginPrompt) loginPrompt.style.display = 'none';
     } else {
         // 未登录，显示登录提示
-        loginPrompt.style.display = 'block';
+        if (loginPrompt) loginPrompt.style.display = 'block';
         // 禁用高级模型选项
         disableAdvancedModels();
     }
@@ -46,95 +46,126 @@ function checkLoginStatus() {
 
 // 启用所有模型选项
 function enableAllModels() {
+    if (!modelSelect) return;
     const options = modelSelect.querySelectorAll('option');
     options.forEach(option => {
         option.disabled = false;
     });
-    document.getElementById('modelInfo').textContent = '已登录，可使用所有模型';
+    const info = document.getElementById('modelInfo');
+    if (info) info.textContent = '已登录，可使用所有模型';
 }
 
 // 禁用高级模型选项
 function disableAdvancedModels() {
+    if (!modelSelect) return;
     const options = modelSelect.querySelectorAll('option[value="advanced"], option[value="premium"]');
     options.forEach(option => {
         option.disabled = true;
     });
-    document.getElementById('modelInfo').textContent = '基础模型功能有限，登录后可解锁更多高级功能';
+    const info = document.getElementById('modelInfo');
+    if (info) info.textContent = '基础模型功能有限，登录后可解锁更多高级功能';
 }
 
 // 绑定事件
 function bindEvents() {
     // 显示登录模态框
-    goToLoginBtn.addEventListener('click', function() {
+    if (goToLoginBtn) goToLoginBtn.addEventListener('click', function() {
         // 重置模态框显示状态
-        registerModalContent.style.display = 'none';
-        loginModalContent.style.display = 'block';
-        loginModal.style.display = 'block';
+        if (registerModalContent) registerModalContent.style.display = 'none';
+        if (loginModalContent) loginModalContent.style.display = 'block';
+        if (loginModal) loginModal.style.display = 'block';
+        // 默认切换到手机号登录标签，贴合 login 页风格
+        modalTabBtns.forEach(b => b.classList.remove('active'));
+        const phoneTab = Array.from(modalTabBtns).find(b => b.getAttribute('data-tab') === 'phone');
+        if (phoneTab) phoneTab.classList.add('active');
+        if (modalPhoneLoginForm) modalPhoneLoginForm.style.display = 'block';
+        if (modalLoginForm) {
+            modalLoginForm.classList.remove('active');
+            modalLoginForm.style.display = 'none';
+        }
     });
     
     // 关闭模态框
-    modalCloseBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            loginModal.style.display = 'none';
+    if (modalCloseBtns && modalCloseBtns.length) {
+        modalCloseBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (loginModal) loginModal.style.display = 'none';
+            });
         });
-    });
+    }
     
     // 点击模态框外部关闭
     window.addEventListener('click', function(event) {
-        if (event.target === loginModal) {
+        if (loginModal && event.target === loginModal) {
             loginModal.style.display = 'none';
         }
     });
     
     // 登录标签切换
-    modalTabBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const tab = this.getAttribute('data-tab');
-            modalTabBtns.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            
-            if (tab === 'username') {
-                modalLoginForm.classList.add('active');
-                modalPhoneLoginForm.style.display = 'none';
-                modalLoginForm.style.display = 'block';
-            } else {
-                modalPhoneLoginForm.style.display = 'block';
-                modalLoginForm.classList.remove('active');
-                modalLoginForm.style.display = 'none';
-            }
+    if (modalTabBtns && modalTabBtns.length) {
+        modalTabBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.getAttribute('data-tab');
+                modalTabBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                if (tab === 'username') {
+                    if (modalLoginForm) {
+                        modalLoginForm.classList.add('active');
+                        modalLoginForm.style.display = 'block';
+                    }
+                    if (modalPhoneLoginForm) modalPhoneLoginForm.style.display = 'none';
+                } else {
+                    if (modalPhoneLoginForm) modalPhoneLoginForm.style.display = 'block';
+                    if (modalLoginForm) {
+                        modalLoginForm.classList.remove('active');
+                        modalLoginForm.style.display = 'none';
+                    }
+                }
+            });
         });
-    });
+    }
     
     // 显示注册表单
-    showRegisterModalLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        loginModalContent.style.display = 'none';
-        registerModalContent.style.display = 'block';
-    });
+    if (showRegisterModalLink) {
+        showRegisterModalLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (loginModalContent) loginModalContent.style.display = 'none';
+            if (registerModalContent) registerModalContent.style.display = 'block';
+        });
+    }
     
     // 显示登录表单
-    showLoginModalLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        registerModalContent.style.display = 'none';
-        loginModalContent.style.display = 'block';
-    });
+    if (showLoginModalLink) {
+        showLoginModalLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (registerModalContent) registerModalContent.style.display = 'none';
+            if (loginModalContent) loginModalContent.style.display = 'block';
+        });
+    }
     
     // 发送验证码
-    modalSendCodeBtn.addEventListener('click', function() {
-        handleSendCode();
-    });
+    if (modalSendCodeBtn) {
+        modalSendCodeBtn.addEventListener('click', function() {
+            handleSendCode();
+        });
+    }
     
     // 用户名密码登录表单提交
-    modalLoginForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleLogin();
-    });
+    if (modalLoginForm) {
+        modalLoginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleLogin();
+        });
+    }
     
     // 手机号验证码登录表单提交
-    modalPhoneLoginForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handlePhoneLogin();
-    });
+    if (modalPhoneLoginForm) {
+        modalPhoneLoginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handlePhoneLogin();
+        });
+    }
     
     // 注册表单提交
     if (modalRegisterForm) {
@@ -145,10 +176,12 @@ function bindEvents() {
     }
     
     // 表单提交
-    configForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        startInterview();
-    });
+    if (configForm) {
+        configForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            startInterview();
+        });
+    }
 }
 
 // 处理用户名密码登录

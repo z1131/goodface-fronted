@@ -20,31 +20,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function bindEvents() {
   // 展示手机号登录表单
-  phoneLoginTrigger.addEventListener('click', () => {
-    phoneForm.style.display = phoneForm.style.display === 'none' || phoneForm.style.display === '' ? 'block' : 'none';
-  });
+  if (phoneLoginTrigger && phoneForm) {
+    phoneLoginTrigger.addEventListener('click', () => {
+      phoneForm.style.display = phoneForm.style.display === 'none' || phoneForm.style.display === '' ? 'block' : 'none';
+    });
+  }
 
   // 游客登录
-  guestLoginTrigger.addEventListener('click', (e) => {
-    e.preventDefault();
-    handleGuestLogin();
-  });
+  if (guestLoginTrigger) {
+    guestLoginTrigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleGuestLogin();
+    });
+  }
 
   // 发送验证码（开发态本地生成）
-  sendCodeBtn.addEventListener('click', () => {
-    handleSendCode();
-  });
+  if (sendCodeBtn) {
+    sendCodeBtn.addEventListener('click', () => {
+      handleSendCode();
+    });
+  }
 
   // 验证码登录
-  loginByCodeBtn.addEventListener('click', () => {
-    handlePhoneLogin();
-  });
+  if (loginByCodeBtn) {
+    loginByCodeBtn.addEventListener('click', () => {
+      handlePhoneLogin();
+    });
+  }
 
   // 导航到已有页面
-  createAccountBtn.addEventListener('click', () => {
-    // 跳转到用户中心页的注册表单
-    window.location.href = 'user.html';
-  });
+  if (createAccountBtn) {
+    createAccountBtn.addEventListener('click', () => {
+      // 跳转到用户中心页的注册表单
+      window.location.href = 'user.html';
+    });
+  }
 }
 
 function handleGuestLogin() {

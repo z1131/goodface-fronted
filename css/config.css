@@ -11,6 +11,8 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    /* 预留底部固定导航的空间，避免遮挡内容 */
+    padding-bottom: 60px;
 }
 
 header {
@@ -24,6 +26,48 @@ header h1 {
     text-align: center;
     color: #2c3e50;
     margin-bottom: 1rem;
+}
+
+/* 头部小提示样式（覆盖原大块样式） */
+header .login-prompt {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: -0.5rem 0 0.5rem; /* 靠近标题并减少占用 */
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: nowrap; /* 保持 p 和 button 同一行 */
+}
+
+header .login-prompt p {
+    margin: 0;
+    font-size: 12px;
+    color: #7f8c8d;
+    white-space: nowrap; /* 文案尽量单行显示 */
+}
+
+.btn-compact {
+    padding: 0.25rem 0.5rem;
+    font-size: 12px; /* 与提示小字匹配 */
+}
+
+/* 头部提示中的按钮使用半透明底色并保持小尺寸 */
+header .login-prompt .btn-primary {
+    background-color: rgba(52, 152, 219, 0.15);
+    color: #3498db;
+    border: 1px solid rgba(52, 152, 219, 0.35);
+    opacity: 0.5; /* 设为半透明 */
+    padding: 0.2rem 0.6rem;
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+
+header .login-prompt .btn-primary:hover {
+    background-color: rgba(52, 152, 219, 0.25);
+    opacity: 0.65;
 }
 
 nav {
@@ -133,10 +177,64 @@ footer {
     padding: 1rem 0;
 }
 
+/* 底部微信风格导航 */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background-color: #fff;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+}
+
+.bottom-nav .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #7f8c8d;
+    height: 100%;
+    min-width: 80px;
+}
+
+.bottom-nav .icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.bottom-nav .label {
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.bottom-nav .nav-item.active .icon,
+.bottom-nav .nav-item.active .label {
+    color: #3498db;
+}
+
+#goToLogin {
+    background-color: rgba(52, 152, 219, 0.15);
+    color: #3498db;
+    border: 1px solid rgba(52, 152, 219, 0.35);
+    opacity: 0.8;
+    padding: 0.25rem 0.6rem;     /* 控制按钮大小 */
+    font-size: 0.875rem;         /* 字体小一点 */
+    border-radius: 4px;          /* 圆角 */
+}
+
+
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .container {
         padding: 10px;
+        padding-bottom: 60px; /* 移动端同样预留底部导航空间 */
     }
     
     nav {

@@ -3,37 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>面试配置 - 面试助手</title>
+    <title>GOODFACE</title>
     <link rel="stylesheet" href="css/config.css">
     <link rel="stylesheet" href="css/modal.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>面试实时辅助助手</h1>
-            <nav>
-                <a href="config.html" class="active">面试配置</a>
-                <a href="interview.html">开始面试</a>
-                <a href="user.html">用户中心</a>
-            </nav>
+            <h1>GOODFACE</h1>
+
         </header>
+        <div class="login-prompt" id="loginPrompt" style="display: none;">
+                <span>登录后可使用更多高级模型和功能</span>
+                <button id="goToLogin" class="btn btn-primary btn-compact">立即登录</button>
+        </div>
 
         <main>
-            <div class="login-prompt" id="loginPrompt" style="display: none;">
-                <p>登录后可使用更多高级模型和功能</p>
-                <button id="goToLogin" class="btn btn-primary">立即登录</button>
-            </div>
+            
 
             <form id="configForm">
                 <div class="form-group">
-                    <label for="model">AI模型</label>
+                    <label for="model">模型选择</label>
                     <select id="model" name="model" required>
                         <option value="">请选择AI模型</option>
                         <option value="basic" selected>基础模型（免费）</option>
                         <option value="advanced" disabled>高级模型（需登录）</option>
                         <option value="premium" disabled>旗舰模型（需登录）</option>
                     </select>
-                    <p class="model-info" id="modelInfo">基础模型功能有限，登录后可解锁更多高级功能</p>
+                    <p id="modelInfo" style="margin-top:6px; font-size:12px; color:#657786;">基础模型功能有限，登录后可解锁更多高级功能</p>
                 </div>
 
                 <div class="form-group">
@@ -71,42 +68,28 @@
                 <span class="close">&times;</span>
                 <h2>用户登录</h2>
                 <div class="login-tabs">
-                    <button class="tab-btn active" data-tab="username">账号密码登录</button>
                     <button class="tab-btn" data-tab="phone">手机验证码登录</button>
                 </div>
                 
-                <!-- 账号密码登录表单 -->
-                <form id="modalLoginForm" class="login-form active">
-                    <div class="form-group">
-                        <label for="modalUsername">用户名</label>
-                        <input type="text" id="modalUsername" name="username" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="modalPassword">密码</label>
-                        <input type="password" id="modalPassword" name="password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block">登录</button>
-                </form>
                 
-                <!-- 手机验证码登录表单 -->
-                <form id="modalPhoneLoginForm" class="login-form" style="display: none;">
+                <!-- 手机验证码登录表单（对齐 login 页面风格） -->
+                <form id="modalPhoneLoginForm" class="login-form phone-form" style="display: none;">
                     <div class="form-group">
                         <label for="modalPhone">手机号</label>
-                        <input type="tel" id="modalPhone" name="phone" required>
+                        <input type="tel" id="modalPhone" name="phone" placeholder="请输入手机号" required>
                     </div>
                     <div class="form-group">
                         <label for="modalCode">验证码</label>
-                        <div class="code-input-group">
-                            <input type="text" id="modalCode" name="code" required>
-                            <button type="button" id="modalSendCodeBtn" class="btn btn-secondary">发送验证码</button>
-                        </div>
+                        <input type="text" id="modalCode" name="code" placeholder="请输入6位验证码" required>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block">登录</button>
+                    <div class="actions">
+                        <button type="button" id="modalSendCodeBtn" class="btn btn-secondary">发送验证码</button>
+                        <button type="submit" class="btn btn-primary">登录</button>
+                    </div>
+                    <p id="modalDevHint" style="margin-top:8px; font-size:12px; color:#657786; display:none;">
+                        开发模式：验证码已生成并显示在弹窗提示中。
+                    </p>
                 </form>
-                
-                <div class="form-footer">
-                    <p>还没有账户？<a href="#" id="showRegisterModal">立即注册</a></p>
-                </div>
             </div>
             
             <!-- 注册表单 -->
@@ -138,11 +121,18 @@
             </div>
         </div>
 
-        <footer>
-            <p>&copy; 2023 面试实时辅助助手. 保留所有权利.</p>
+        <footer class="bottom-nav" role="navigation" aria-label="底部导航">
+            <a href="config.html" class="nav-item active" aria-label="面试配置">
+                <span class="icon">📋</span>
+                <span class="label">面试</span>
+            </a>
+            <a href="user.html" class="nav-item" aria-label="用户中心">
+                <span class="icon">👤</span>
+                <span class="label">用户</span>
+            </a>
         </footer>
     </div>
 
-    <script src="js/config.js"></script>
+    <script src="js/config.js?v=3"></script>
 </body>
 </html>

@@ -8,14 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>面试实时辅助助手</h1>
-            <nav>
-                <a href="config.html">面试配置</a>
-                <a href="interview.html" class="active">开始面试</a>
-                <a href="user.html">用户中心</a>
-            </nav>
-        </header>
+        
 
         <main>
             <div class="interview-section">
@@ -39,14 +32,13 @@
             <div class="interview-actions">
                 <button id="pauseInterview" class="btn btn-secondary">暂停面试</button>
                 <button id="endInterview" class="btn btn-secondary">结束面试</button>
+                <span id="interviewTimer" class="timer-display" aria-label="计时器">00:00</span>
             </div>
         </main>
 
         <footer>
-            <p>&copy; 2023 面试实时辅助助手. 保留所有权利.</p>
         </footer>
     </div>
-
     <script src="js/interview.js"></script>
 </body>
 </html>

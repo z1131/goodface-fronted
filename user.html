@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用户中心 - 面试助手</title>
+    <title>GOODFACE</title>
     <link rel="stylesheet" href="css/user.css">
+    <link rel="stylesheet" href="css/modal.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>面试实时辅助助手</h1>
-            <nav>
-                <a href="config.html">面试配置</a>
-                <a href="interview.html">开始面试</a>
-                <a href="user.html" class="active">用户中心</a>
-            </nav>
+            <h1>GOODFACE</h1>
         </header>
 
         <main>
+
             <div class="user-section" id="profileSection">
                 <h2>用户信息</h2>
                 <div class="profile-info" id="userInfo">
@@ -47,84 +44,12 @@
                     <button id="logoutBtn" class="btn btn-secondary">退出登录</button>
                     <button id="rechargeBtn" class="btn btn-primary">充值</button>
                 </div>
-                
-                <div id="loginPromptSection">
-                    <p>您尚未登录，请先登录以查看您的账户信息。</p>
-                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                        <button id="showLoginBtn" class="btn btn-primary">短信或账号登录</button>
-                        <button id="guestLoginBtn" class="btn btn-secondary">以游客体验</button>
-                    </div>
-                    <p style="margin-top:0.5rem; color:#666; font-size:0.9rem;">
-                        游客模式功能受限：不保存云端数据，仅可使用基础模型。
-                    </p>
-                </div>
-                
-                <div class="user-section" id="loginSection" style="display: none; margin-top: 2rem;">
-                    <h2>用户登录</h2>
-                    <div class="login-tabs">
-                        <button class="tab-btn active" data-tab="username">账号密码登录</button>
-                        <button class="tab-btn" data-tab="phone">手机验证码登录</button>
-                    </div>
-                    
-                    <!-- 账号密码登录表单 -->
-                    <form id="loginForm" class="login-form active">
-                        <div class="form-group">
-                            <label for="username">用户名</label>
-                            <input type="text" id="username" name="username" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="password">密码</label>
-                            <input type="password" id="password" name="password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">登录</button>
-                    </form>
-                    
-                    <!-- 手机验证码登录表单 -->
-                    <form id="phoneLoginForm" class="login-form" style="display: none;">
-                        <div class="form-group">
-                            <label for="phone">手机号</label>
-                            <input type="tel" id="phone" name="phone" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="code">验证码</label>
-                            <div class="code-input-group">
-                                <input type="text" id="code" name="code" required>
-                                <button type="button" id="sendCodeBtn" class="btn btn-secondary">发送验证码</button>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">登录</button>
-                    </form>
-                    
-                    <div class="form-footer">
-                        <p>还没有账户？<a href="#" id="showRegister">立即注册</a></p>
-                    </div>
-                </div>
 
-                <div class="user-section" id="registerSection" style="display: none; margin-top: 2rem;">
-                    <h2>用户注册</h2>
-                    <form id="registerForm">
-                        <div class="form-group">
-                            <label for="regUsername">用户名</label>
-                            <input type="text" id="regUsername" name="regUsername" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="regEmail">邮箱</label>
-                            <input type="email" id="regEmail" name="regEmail" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="regPassword">密码</label>
-                            <input type="password" id="regPassword" name="regPassword" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="regConfirmPassword">确认密码</label>
-                            <input type="password" id="regConfirmPassword" name="regConfirmPassword" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">注册</button>
-                    </form>
-                    <div class="form-footer">
-                        <p>已有账户？<a href="#" id="showLogin">立即登录</a></p>
-                    </div>
-                </div>
+                            <!-- 紧凑登录提示：仅一个“立即登录”按钮，点击后再显示登录窗口 -->
+            <div id="loginPromptSection" class="login-prompt" aria-label="登录提示">
+                <button id="showLoginBtn" class="btn btn-primary btn-compact">立即登录</button>
+            </div>
+                
                 
                 <div class="recharge-section" id="rechargeSection" style="display: none; margin-top: 2rem;">
                     <h3>账户充值</h3>
@@ -151,11 +76,61 @@
             </div>
         </main>
 
-        <footer>
-            <p>&copy; 2023 面试实时辅助助手. 保留所有权利.</p>
+        <footer class="bottom-nav" role="navigation" aria-label="底部导航">
+            <a href="config.html" class="nav-item" aria-label="面试配置">
+                <span class="icon">📋</span>
+                <span class="label">面试</span>
+            </a>
+            <a href="user.html" class="nav-item active" aria-label="用户中心">
+                <span class="icon">👤</span>
+                <span class="label">用户</span>
+            </a>
         </footer>
+    </div>
+    
+    <!-- 用户页登录模态（仅手机号登录，风格对齐 login 页） -->
+    <div id="userLoginModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>用户登录</h2>
+            <form id="uModalPhoneLoginForm" class="login-form phone-form" style="display:block;">
+                <div class="form-group">
+                    <label for="uModalPhone">手机号</label>
+                    <input type="tel" id="uModalPhone" placeholder="请输入手机号" required>
+                </div>
+                <div class="form-group">
+                    <label for="uModalCode">验证码</label>
+                    <input type="text" id="uModalCode" placeholder="请输入6位验证码" required>
+                </div>
+                <div class="actions">
+                    <button type="button" id="uModalSendCodeBtn" class="btn btn-secondary">发送验证码</button>
+                    <button type="submit" class="btn btn-primary">登录</button>
+                </div>
+                <p style="margin-top:8px; font-size:12px; color:#657786; display:none;">开发模式：验证码已生成并显示在弹窗提示中。</p>
+            </form>
+        </div>
     </div>
 
     <script src="js/user.js"></script>
+    <script>
+      // 简单兜底：确保用户页登录按钮存在时可打开模态
+      document.addEventListener('DOMContentLoaded', function(){
+        var btn = document.getElementById('showLoginBtn');
+        var modal = document.getElementById('userLoginModal');
+        if(btn && modal){
+          btn.addEventListener('click', function(){ modal.style.display = 'block'; });
+          modal.addEventListener('click', function(e){ if(e.target === modal) modal.style.display = 'none'; });
+          var closeEls = modal.querySelectorAll('.close');
+          closeEls.forEach(function(el){ el.addEventListener('click', function(){ modal.style.display = 'none'; }); });
+        }
+        var sendBtn = document.getElementById('uModalSendCodeBtn');
+        if(sendBtn){
+          sendBtn.addEventListener('click', function(){
+            var countdown = 60; var btn = sendBtn; btn.disabled = true; btn.textContent = countdown + '秒后重发';
+            var timer = setInterval(function(){ countdown--; btn.textContent = countdown + '秒后重发'; if(countdown<=0){ clearInterval(timer); btn.disabled=false; btn.textContent='发送验证码'; } },1000);
+          });
+        }
+      });
+    </script>
 </body>
 </html>
