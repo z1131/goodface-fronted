@@ -415,12 +415,11 @@ function handleRegister() {
 
 // 开始面试
 function startInterview() {
-    const model = document.getElementById('model').value;
-    const industry = document.getElementById('industry').value;
-    const position = document.getElementById('position').value;
+    const model = document.getElementById('model') ? document.getElementById('model').value : '';
+    const prompt = document.getElementById('prompt') ? document.getElementById('prompt').value.trim() : '';
     
-    // 验证必填字段
-    if (!model || !industry || !position) {
+    // 验证必填字段（模型与提示词）
+    if (!model || !prompt) {
         alert('请填写所有必填字段');
         return;
     }
@@ -437,8 +436,7 @@ function startInterview() {
     // 保存配置到localStorage
     const config = {
         model: model,
-        industry: industry,
-        position: position,
+        prompt: prompt,
         timestamp: new Date().toISOString()
     };
     localStorage.setItem('interviewConfig', JSON.stringify(config));

@@ -391,16 +391,19 @@ function handlePhoneLogin() {
 
 // 游客登录（前端直接生成访客令牌）
 function handleGuestLogin() {
+    // 不写入 token，保持“未登录”状态；标注游客角色与基础能力
     const guest = {
         username: '访客',
         email: '-',
-        token: 'guest-token-' + Date.now(),
+        token: null,
         balance: '0.00',
         membership: '游客',
-        role: 'guest'
+        role: 'guest',
+        capabilities: ['basic']
     };
     localStorage.setItem('interviewUser', JSON.stringify(guest));
-    showProfile(guest);
+    // 用户页显示未登录提示，而不是登录后的个人信息
+    showLoginPrompt();
     alert('已进入游客模式：仅可使用基础模型');
 }
 

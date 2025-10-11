@@ -21,8 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function bindEvents() {
   // 展示手机号登录表单
   if (phoneLoginTrigger && phoneForm) {
-    phoneLoginTrigger.addEventListener('click', () => {
-      phoneForm.style.display = phoneForm.style.display === 'none' || phoneForm.style.display === '' ? 'block' : 'none';
+    // 禁用手机号登录按钮的点击事件
+    phoneLoginTrigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      return false;
     });
   }
 
@@ -59,18 +61,19 @@ function bindEvents() {
 
 function handleGuestLogin() {
   if (DEV_MODE) {
-    const token = 'guest-' + Math.random().toString(36).slice(2);
+    // 开发态：不生成 token，标注游客角色与基础能力
     const user = {
       username: '游客',
       email: 'guest@example.com',
-      token,
+      token: null,
       balance: '0.00',
-      membership: '普通用户',
+      membership: '游客',
+      role: 'guest',
       capabilities: ['basic']
     };
     localStorage.setItem('interviewUser', JSON.stringify(user));
     alert('已进入游客模式（功能受限）');
-    // 登录后跳转到面试配置页
+    // 跳转到面试配置页（仍视为未登录，仅可基础模型）
     window.location.href = 'config.html';
     return;
   }
@@ -84,9 +87,11 @@ function handleGuestLogin() {
       const user = {
         username: res.username,
         email: res.email,
-        token: res.token,
+        token: res.token || null, // 后端不下发 token 时为未登录态
         balance: res.balance,
-        membership: res.membership
+        membership: res.membership || '游客',
+        role: res.role || 'guest',
+        capabilities: res.capabilities || ['basic']
       };
       localStorage.setItem('interviewUser', JSON.stringify(user));
       alert('已进入游客模式（功能受限）');

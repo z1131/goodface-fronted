@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GOODFACE</title>
-    <link rel="stylesheet" href="css/user.css">
+    <link rel="stylesheet" href="css/user.css?v=2">
     <link rel="stylesheet" href="css/modal.css">
 </head>
 <body>
@@ -30,14 +30,6 @@
                         <label>邮箱:</label>
                         <span id="profileEmail">-</span>
                     </div>
-                    <div class="info-item">
-                        <label>账户余额:</label>
-                        <span id="accountBalance">¥0.00</span>
-                    </div>
-                    <div class="info-item">
-                        <label>会员等级:</label>
-                        <span id="membershipLevel">普通用户</span>
-                    </div>
                 </div>
                 
                 <div class="profile-actions" id="profileActions" style="display: none;">
@@ -47,7 +39,7 @@
 
                             <!-- 紧凑登录提示：仅一个“立即登录”按钮，点击后再显示登录窗口 -->
             <div id="loginPromptSection" class="login-prompt" aria-label="登录提示">
-                <button id="showLoginBtn" class="btn btn-primary btn-compact">立即登录</button>
+                <button id="showLoginBtn" class="btn btn-primary btn-compact" disabled style="background-color: #cccccc; cursor: not-allowed;">立即登录</button>
             </div>
                 
                 

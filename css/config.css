@@ -99,17 +99,24 @@ main {
 }
 
 .login-prompt {
-    background-color: #e8f4fc;
-    border: 1px solid #3498db;
-    border-radius: 4px;
-    padding: 1rem;
-    margin-bottom: 2rem;
+    box-sizing: border-box;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0.5rem 0; /* 去掉左右内边距，与 header 视觉对齐 */
+    margin: -0.5rem 0 1rem; /* 微调与标题间距 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     text-align: center;
 }
 
 .login-prompt p {
-    margin: 0 0 1rem 0;
-    color: #2c3e50;
+    margin: 0;
+    font-size: 12px;
+    color: #7f8c8d;
+    white-space: nowrap;
 }
 
 .form-group {
@@ -124,6 +131,21 @@ main {
 }
 
 .form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    background-color: #fff;
+    box-sizing: border-box;
+}
+
+/* 输入框与下拉统一样式 */
+.form-group input[type="text"],
+.form-group input[type="tel"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="password"] {
     width: 100%;
     padding: 0.75rem;
     border: 1px solid #ddd;
@@ -245,4 +267,9 @@ footer {
     main {
         padding: 1rem;
     }
+}
+
+/* 通用隐藏类，用于临时隐藏元素 */
+.hidden {
+    display: none !important;
 }

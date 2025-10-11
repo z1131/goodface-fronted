@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GOODFACE</title>
-    <link rel="stylesheet" href="css/config.css">
+    <link rel="stylesheet" href="css/config.css?v=3">
     <link rel="stylesheet" href="css/modal.css">
 </head>
 <body>
@@ -13,9 +13,9 @@
             <h1>GOODFACE</h1>
 
         </header>
-        <div class="login-prompt" id="loginPrompt" style="display: none;">
+        <div class="login-prompt hidden" id="loginPrompt">
                 <span>登录后可使用更多高级模型和功能</span>
-                <button id="goToLogin" class="btn btn-primary btn-compact">立即登录</button>
+                <button id="goToLogin" class="btn btn-primary btn-compact" disabled style="background-color: #cccccc; cursor: not-allowed;">立即登录</button>
         </div>
 
         <main>
@@ -34,28 +34,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="industry">行业</label>
-                    <select id="industry" name="industry" required>
-                        <option value="">请选择行业</option>
-                        <option value="technology">互联网/科技</option>
-                        <option value="finance">金融</option>
-                        <option value="healthcare">医疗健康</option>
-                        <option value="education">教育</option>
-                        <option value="manufacturing">制造业</option>
-                        <option value="retail">零售/电商</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="position">职位</label>
-                    <select id="position" name="position" required>
-                        <option value="">请选择职位</option>
-                        <option value="developer">软件开发工程师</option>
-                        <option value="manager">项目经理</option>
-                        <option value="designer">UI/UX设计师</option>
-                        <option value="analyst">数据分析师</option>
-                        <option value="tester">测试工程师</option>
-                    </select>
+                    <label for="prompt">提示词</label>
+                    <input type="text" id="prompt" name="prompt" required placeholder="请输入面试提示词，例如：我面试的岗位为java后端开发">
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-block">开始面试</button>
@@ -133,6 +113,6 @@
         </footer>
     </div>
 
-    <script src="js/config.js?v=3"></script>
+    <script src="js/config.js?v=4"></script>
 </body>
 </html>
