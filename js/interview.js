@@ -113,7 +113,7 @@ function bindEvents() {
 
 // 初始化WebSocket连接
 function initWebSocket() {
-    // 优先使用portal下发的wsUrl与sessionId
+    // 优先使用portal下发的wsUrl与sessionId（必须存在）
     let wsUrl;
     try {
         const raw = localStorage.getItem('interviewSession');
@@ -125,10 +125,11 @@ function initWebSocket() {
     } catch (e) {
         console.warn('interviewSession解析失败，将使用默认连接', e);
     }
-    // 兜底生成会话ID与默认地址（本地联调）
-    if (!wsUrl) {
-        sessionId = 'session_' + Date.now();
-        wsUrl = `ws://127.0.0.1:8003/audio/stream?sessionId=${sessionId}`;
+    // 没有有效的会话信息，返回配置页重新创建会话
+    if (!wsUrl || !sessionId) {
+        alert('未找到有效会话，请返回配置页重新开始面试。');
+        window.location.href = 'config.html';
+        return;
     }
     // 创建WebSocket连接
     webSocket = new WebSocket(wsUrl);

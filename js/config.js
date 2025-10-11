@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 检查用户登录状态
     try { checkLoginStatus(); } catch (e) { console.warn('checkLoginStatus执行异常', e); }
     
+    // 模型下拉首次聚焦时从后端拉取可用模型
+    try { setupModelLoader(); } catch (e) { console.warn('setupModelLoader执行异常', e); }
+
     // 绑定事件
     try { bindEvents(); } catch (e) { console.warn('bindEvents执行异常', e); }
 });
@@ -58,11 +61,17 @@ function enableAllModels() {
 // 禁用高级模型选项
 function disableAdvancedModels() {
     if (!modelSelect) return;
-    const options = modelSelect.querySelectorAll('option[value="advanced"], option[value="premium"]');
-    options.forEach(option => {
-        option.disabled = true;
-    });
+    // 若后端已返回模型列表，则根据 requiresAuth 字段禁用
     const info = document.getElementById('modelInfo');
+    const user = safeGetUser();
+    const options = modelSelect.querySelectorAll('option');
+    options.forEach(option => {
+        const requiresAuth = option.getAttribute('data-requires-auth') === 'true';
+        if (requiresAuth && (!user || !user.token)) {
+            option.disabled = true;
+            option.title = '访客功能受限：登录后可用';
+        }
+    });
     if (info) info.textContent = '基础模型功能有限，登录后可解锁更多高级功能';
 }
 
@@ -182,6 +191,51 @@ function bindEvents() {
             startInterview();
         });
     }
+}
+
+// 仅在首次聚焦下拉框时从后端拉取模型列表
+let modelsLoaded = false;
+function setupModelLoader() {
+    if (!modelSelect) return;
+    const loadOnce = () => {
+        if (modelsLoaded) return;
+        loadModelsFromBackend().then(() => {
+            modelsLoaded = true;
+            // 拉取后根据登录状态更新禁用态
+            checkLoginStatus();
+        }).catch(e => {
+            console.warn('拉取模型失败，继续使用前端默认项：', e);
+        });
+    };
+    // 用户点击或聚焦时触发加载
+    modelSelect.addEventListener('focus', loadOnce, { once: false });
+    modelSelect.addEventListener('click', loadOnce, { once: false });
+}
+
+// 从后端拉取模型并填充下拉框
+function loadModelsFromBackend() {
+    return fetch('http://127.0.0.1:8001/api/interview/models')
+        .then(resp => resp.json())
+        .then(result => {
+            if (!result || result.code !== 200 || !Array.isArray(result.data)) {
+                throw new Error('后端返回格式不正确');
+            }
+            const models = result.data;
+            if (models.length === 0) return;
+            // 清空现有选项并填充新模型
+            modelSelect.innerHTML = '';
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                // 仅选择 LLM 模型值
+                opt.value = m.llmModel || m.id || m.name || 'qwen-turbo';
+                opt.textContent = m.name || m.llmModel || m.id;
+                opt.setAttribute('data-llm-model', m.llmModel || '');
+                opt.setAttribute('data-tier', m.tier || 'basic');
+                opt.setAttribute('data-provider', m.provider || 'aliyun');
+                opt.setAttribute('data-requires-auth', String(!!m.requiresAuth));
+                modelSelect.appendChild(opt);
+            });
+        });
 }
 
 // 处理用户名密码登录
@@ -424,55 +478,50 @@ function startInterview() {
         return;
     }
     
-    // 检查是否选择了需要登录的模型但未登录
+    // 检查是否选择了需要登录的模型但未登录（基于返回的 requiresAuth）
     const user = safeGetUser();
-    if ((model === 'advanced' || model === 'premium') && (!user || !user.token)) {
+    const selected = modelSelect && modelSelect.selectedIndex >= 0 ? modelSelect.options[modelSelect.selectedIndex] : null;
+    const requiresAuth = selected ? (selected.getAttribute('data-requires-auth') === 'true') : false;
+    if (requiresAuth && (!user || !user.token)) {
         alert('该模型需要登录后才能使用，请先登录！');
         // 显示登录模态框
-        loginModal.style.display = 'block';
+        if (loginModal) loginModal.style.display = 'block';
         return;
     }
     
     // 保存配置到localStorage
     const config = {
+        // 将所选 LLM 型号作为后端使用的模型标识
         model: model,
         prompt: prompt,
         timestamp: new Date().toISOString()
     };
     localStorage.setItem('interviewConfig', JSON.stringify(config));
 
-    // 通过portal创建会话并获取wsUrl
+    // 通过portal创建会话并获取wsUrl（必须成功，否则不进入面试页面）
+    const userId = user && (user.userId || user.username || user.email) || null;
     fetch('http://127.0.0.1:8001/api/interview/session', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ config })
+        body: JSON.stringify({ userId, config })
     })
     .then(resp => resp.json())
     .then(result => {
-        if (result && result.code === 200 && result.data && result.data.wsUrl) {
+        if (result && result.code === 200 && result.data && result.data.wsUrl && result.data.sessionId) {
             localStorage.setItem('interviewSession', JSON.stringify(result.data));
             window.location.href = 'interview.html';
         } else {
-            console.warn('会话创建失败，使用本地兜底:', result);
-            const fallback = {
-                sessionId: 'sess_' + Date.now(),
-                wsUrl: 'ws://127.0.0.1:8003/audio/stream?sessionId=' + ('sess_' + Date.now())
-            };
-            localStorage.setItem('interviewSession', JSON.stringify(fallback));
-            window.location.href = 'interview.html';
+            console.warn('会话创建失败:', result);
+            alert('会话创建失败，请稍后重试或检查门户服务是否已启动。');
+            // 不再兜底直连 interview，避免 SESSION_NOT_ACTIVE
         }
     })
     .catch(err => {
-        console.warn('会话创建异常，使用本地兜底:', err);
-        const fallbackId = 'sess_' + Date.now();
-        const fallback = {
-            sessionId: fallbackId,
-            wsUrl: 'ws://127.0.0.1:8003/audio/stream?sessionId=' + fallbackId
-        };
-        localStorage.setItem('interviewSession', JSON.stringify(fallback));
-        window.location.href = 'interview.html';
+        console.warn('会话创建异常:', err);
+        alert('会话创建异常，请确认 goodface-portal 已在端口 8001 运行。');
+        // 不再兜底直连 interview，避免 SESSION_NOT_ACTIVE
     });
 }
 
