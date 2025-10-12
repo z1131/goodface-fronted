@@ -54,6 +54,15 @@ main {
     margin-bottom: 2rem;
 }
 
+/* 主内容布局（移除侧栏样式） */
+.content-layout {
+    display: block;
+}
+
+.content-main {
+    width: 100%;
+}
+
 .interview-section {
     margin-bottom: 2rem;
 }
@@ -159,6 +168,9 @@ footer {
 @media (max-width: 768px) {
     .container {
         padding: 10px;
+    }
+    .content-layout {
+        display: block;
     }
     
     nav {

@@ -5,6 +5,8 @@ const pauseInterviewBtn = document.getElementById('pauseInterview');
 const endInterviewBtn = document.getElementById('endInterview');
 const questionDisplay = document.getElementById('questionDisplay');
 const answerDisplay = document.getElementById('answerDisplay');
+
+const isPreview = new URLSearchParams(window.location.search).has('preview');
 const timerDisplay = document.getElementById('interviewTimer');
 let answerStarted = false; // 是否已开始接收答案流
 let answerBuffer = ""; // 累积答案文本用于 Markdown 渲染
@@ -113,7 +115,14 @@ function bindEvents() {
 
 // 初始化WebSocket连接
 function initWebSocket() {
-    // 优先使用portal下发的wsUrl与sessionId（必须存在）
+    // 预览模式：跳过WebSocket连接，演示UI
+    if (isPreview) {
+        // 预览模式：仅展示一个示例问题
+        displayQuestion('请用STAR法介绍一个你主导的项目');
+        return;
+    }
+
+    // 正常模式：使用portal下发的wsUrl与sessionId
     let wsUrl;
     try {
         const raw = localStorage.getItem('interviewSession');
@@ -154,19 +163,25 @@ function initWebSocket() {
             }
 
             if (data.type === 'stt_partial') {
-                // 将实时识别的面试官话语展示为“面试官问题”（临时）
-                questionDisplay.innerHTML = `<p style="color:#2c3e50;">${data.content}</p>`;
+                // 新流程：不展示 STT 文本，仅在识别出新问题后展示
                 return;
             }
 
             if (data.type === 'stt_final') {
-                // 句子结束，用最终识别结果更新“面试官问题”
-                questionDisplay.innerHTML = `<p>${data.content}</p>`;
+                // 新流程：不展示 STT 最终文本，改由后端推送 question
                 return;
             }
 
             if (data.type === 'question') {
+                // 收到新问题：清空旧答案并重置缓冲
+                try {
+                    answerDisplay.innerHTML = '';
+                    answerBuffer = '';
+                    answerStarted = false;
+                } catch (e) { console.warn('清空旧答案失败:', e); }
+
                 displayQuestion(data.content);
+                // 不再展示侧栏候选问题
             } else if (data.type === 'answer') {
                 if (data.content === '[END]') {
                     const endTag = document.createElement('p');
@@ -275,7 +290,9 @@ function togglePause() {
 
 // 显示问题
 function displayQuestion(question) {
-    questionDisplay.innerHTML = `<p>${question}</p>`;
+    // 直接显示本次识别的问题文本
+    const top = String(question || '').trim();
+    questionDisplay.innerHTML = `<p>${top}</p>`;
 }
 
 // 显示回答
@@ -306,6 +323,8 @@ function appendAnswerChunk(text) {
         console.error('追加答案片段失败:', e);
     }
 }
+
+// 侧栏候选问题功能已移除
 
 // 结束面试
 function endInterview() {
