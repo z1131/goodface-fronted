@@ -262,7 +262,7 @@ function handleLogin() {
     }
     
     // 发送登录请求
-    fetch('http://127.0.0.1:8081/api/user/login', {
+    fetch('/api/user/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

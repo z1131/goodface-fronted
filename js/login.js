@@ -1,7 +1,7 @@
 // 独立登录页脚本（开发态支持游客与本地验证码登录）
 
 const DEV_MODE = false; // 开发阶段接入后端服务
-const BACKEND_BASE_URL = 'http://localhost:8001'; // 门户服务基础URL（本地开发）
+const BACKEND_BASE_URL = window.location.origin; // 生产使用同域，配合 Nginx 反代
 
 // 元素绑定
 const phoneLoginTrigger = document.getElementById('phoneLoginTrigger');

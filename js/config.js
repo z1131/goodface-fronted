@@ -214,7 +214,7 @@ function setupModelLoader() {
 
 // 从后端拉取模型并填充下拉框
 function loadModelsFromBackend() {
-    return fetch('http://127.0.0.1:8001/api/interview/models')
+    return fetch('/api/interview/models')
         .then(resp => resp.json())
         .then(result => {
             if (!result || result.code !== 200 || !Array.isArray(result.data)) {
@@ -250,7 +250,7 @@ function handleLogin() {
     }
     
     // 发送登录请求
-    fetch('http://127.0.0.1:8081/api/user/login', {
+    fetch('/api/user/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -307,7 +307,7 @@ function handlePhoneLogin() {
     }
     
     // 发送登录请求
-    fetch('http://127.0.0.1:8081/api/user/loginByCode', {
+    fetch('/api/user/loginByCode', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -500,7 +500,7 @@ function startInterview() {
 
     // 通过portal创建会话并获取wsUrl（必须成功，否则不进入面试页面）
     const userId = user && (user.userId || user.username || user.email) || null;
-    fetch('http://127.0.0.1:8001/api/interview/session', {
+    fetch('/api/interview/session', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
