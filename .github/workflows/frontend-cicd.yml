@@ -23,7 +23,7 @@ jobs:
           set -e
           echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
           IMAGE="$ACR_REGISTRY/$ACR_NAMESPACE/goodface-fronted-nginx:$IMAGE_TAG"
-          docker build -f 前端/deploy/Dockerfile -t "$IMAGE" .
+          docker build -f deploy/Dockerfile -t "$IMAGE" .
           docker push "$IMAGE"
 
       - name: Prepare dist
@@ -31,10 +31,10 @@ jobs:
           set -e
           rm -rf dist && mkdir -p dist/html
           # 同步静态文件（排除内部目录）
-          rsync -av --delete --exclude '.git' --exclude '.github' --exclude 'deploy' --exclude '.vscode' --exclude '_ws_test' 前端/ dist/html/
+          rsync -av --delete --exclude '.git' --exclude '.github' --exclude 'deploy' --exclude '.vscode' --exclude '_ws_test' ./ dist/html/
           # 拷贝 Nginx 部署模板
-          cp -v 前端/deploy/docker-compose.yml dist/
-          cp -v 前端/deploy/nginx.conf dist/
+          cp -v deploy/docker-compose.yml dist/
+          cp -v deploy/nginx.conf dist/
 
       - name: Upload dist to ECS (home tmp)
         uses: appleboy/scp-action@v0.1.7
