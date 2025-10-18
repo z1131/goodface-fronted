@@ -12,78 +12,94 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare frontend artifacts
+      - name: Build & Push Nginx image to ACR
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           set -e
-          mkdir -p dist/html
-          # 将仓库根目录（排除内部目录）同步到 dist/html
-          rsync -av --delete \
-            --exclude='.DS_Store' \
-            --exclude='.github' \
-            --exclude='.git' \
-            --exclude='deploy' \
-            --exclude='dist' \
-            ./ dist/html/
-          # 附带部署模板
-          cp deploy/nginx.conf dist/nginx.conf
-          cp deploy/docker-compose.yml dist/docker-compose.yml
+          echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
+          IMAGE="$ACR_REGISTRY/$ACR_NAMESPACE/goodface-fronted-nginx:$IMAGE_TAG"
+          docker build -f 前端/deploy/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
 
-      - name: Ensure remote staging directory exists (/tmp)
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.ECS_HOST }}
-          port: ${{ secrets.ECS_PORT }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          script: |
-            set -e
-            sudo mkdir -p /tmp/goodface-fronted
-            sudo rm -rf /tmp/goodface-fronted/* || true
+      - name: Prepare dist
+        run: |
+          set -e
+          rm -rf dist && mkdir -p dist/html
+          # 同步静态文件（排除内部目录）
+          rsync -av --delete --exclude '.git' --exclude '.github' --exclude 'deploy' --exclude '.vscode' --exclude '_ws_test' 前端/ dist/html/
+          # 拷贝 Nginx 部署模板
+          cp -v 前端/deploy/docker-compose.yml dist/
+          cp -v 前端/deploy/nginx.conf dist/
 
-      - name: Upload artifacts to ECS (to /tmp)
+      - name: Upload dist to ECS (home tmp)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          source: "dist"
-          target: "/tmp/goodface-fronted/"
+          source: "dist/*"
+          target: "/tmp/goodface-fronted/dist"
           overwrite: true
 
-      - name: Deploy Nginx via Docker Compose to /opt/goodface-fronted
+      - name: Deploy on ECS via SSH
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+          IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.ECS_HOST }}
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          command_timeout: 600s
           script: |
-            set -e
+            set -euo pipefail
+            echo "===> Prepare /opt/goodface-fronted"
             sudo mkdir -p /opt/goodface-fronted
-            # 识别上传根目录（dist）并同步到 /opt
-            SRC="/tmp/goodface-fronted/dist"
-            if [ ! -d "$SRC" ]; then
-              SRC="/tmp/goodface-fronted"
+
+            echo "===> Move dist into /opt/goodface-fronted"
+            if [ -d /tmp/goodface-fronted/dist ]; then
+              sudo rsync -a --delete /tmp/goodface-fronted/dist/ /opt/goodface-fronted/
+            elif [ -d /tmp/goodface-fronted ]; then
+              sudo rsync -a --delete /tmp/goodface-fronted/ /opt/goodface-fronted/
             fi
-            sudo rsync -av --delete "$SRC/" /opt/goodface-fronted/
-            sudo rm -rf /tmp/goodface-fronted
 
             cd /opt/goodface-fronted
+            echo "===> Tree"
             ls -la
-            if [ ! -f docker-compose.yml ]; then
-              echo "ERROR: missing docker-compose.yml in /opt/goodface-fronted" >&2
-              exit 1
-            fi
 
-            # 兼容 docker compose v2 与旧版 docker-compose
-            if command -v docker-compose >/dev/null 2>&1; then
-              COMPOSE_CMD="sudo docker-compose -f docker-compose.yml"
+            echo "===> Write .env for compose"
+            sudo tee /opt/goodface-fronted/.env >/dev/null << EOF
+            ACR_REGISTRY=${ACR_REGISTRY}
+            ACR_NAMESPACE=${ACR_NAMESPACE}
+            IMAGE_TAG=${IMAGE_TAG}
+            EOF
+
+            echo "===> Detect docker compose"
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE_CMD="sudo docker compose"
+            elif docker-compose version >/dev/null 2>&1; then
+              COMPOSE_CMD="sudo docker-compose"
             else
-              COMPOSE_CMD="sudo docker compose -f docker-compose.yml"
+              echo "ERROR: docker compose not installed" && exit 1
             fi
 
-            $COMPOSE_CMD up -d --remove-orphans
-            $COMPOSE_CMD exec -T goodface-fronted nginx -t
-            $COMPOSE_CMD exec -T goodface-fronted nginx -s reload || $COMPOSE_CMD restart goodface-fronted
+            echo "===> Compose pull & up"
+            if echo "$COMPOSE_CMD" | grep -q 'docker compose'; then
+              $COMPOSE_CMD --env-file .env -f docker-compose.yml pull
+              $COMPOSE_CMD --env-file .env -f docker-compose.yml up -d --remove-orphans
+            else
+              # compose v1 自动读取 .env
+              $COMPOSE_CMD -f docker-compose.yml pull
+              $COMPOSE_CMD -f docker-compose.yml up -d --remove-orphans
+            fi
+
+            echo "===> Validate nginx"
+            docker exec goodface-fronted nginx -t
+            docker exec goodface-fronted nginx -s reload || docker restart goodface-fronted

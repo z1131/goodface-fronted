@@ -1,6 +1,6 @@
 services:
   goodface-fronted:
-    image: registry.cn-hangzhou.aliyuncs.com/library/nginx:1.25-alpine
+    image: ${ACR_REGISTRY}/${ACR_NAMESPACE}/goodface-fronted-nginx:${IMAGE_TAG}
     container_name: goodface-fronted
     restart: always
     ports:
