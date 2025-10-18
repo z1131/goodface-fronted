@@ -30,8 +30,15 @@ jobs:
         run: |
           set -e
           rm -rf dist && mkdir -p dist/html
-          # 同步静态文件（排除内部目录）
-          rsync -av --delete --exclude '.git' --exclude '.github' --exclude 'deploy' --exclude '.vscode' --exclude '_ws_test' ./ dist/html/
+          # 同步静态文件（排除内部目录，避免自复制 dist）
+          rsync -av --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'deploy' \
+            --exclude '.vscode' \
+            --exclude '_ws_test' \
+            --exclude 'dist' \
+            ./ dist/html/
           # 拷贝 Nginx 部署模板
           cp -v deploy/docker-compose.yml dist/
           cp -v deploy/nginx.conf dist/
@@ -58,6 +65,7 @@ jobs:
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
+          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG
           script: |
             set -euo pipefail
             echo "===> Prepare /opt/goodface-fronted"
@@ -71,8 +79,23 @@ jobs:
             fi
 
             cd /opt/goodface-fronted
-            echo "===> Tree"
+            echo "===> Tree (before flatten)"
             ls -la
+
+            # 若仍存在 dist 子目录，扁平化到根目录
+            if [ -d dist ]; then
+              echo "===> Flatten dist to root"
+              sudo rsync -a --delete dist/ .
+              sudo rm -rf dist
+            fi
+
+            echo "===> Tree (after flatten)"
+            ls -la
+
+            if [ ! -f docker-compose.yml ]; then
+              echo "ERROR: missing docker-compose.yml in /opt/goodface-fronted" >&2
+              exit 1
+            fi
 
             echo "===> Write .env for compose"
             sudo tee /opt/goodface-fronted/.env >/dev/null << EOF
