@@ -62,12 +62,13 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          FRONT_HTTP_PORT: ${{ secrets.FRONT_HTTP_PORT }}
         with:
           host: ${{ secrets.ECS_HOST }}
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD
+          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD,FRONT_HTTP_PORT
           script: |
             set -euo pipefail
             echo "===> Prepare /opt/goodface-fronted"
@@ -104,6 +105,7 @@ jobs:
             ACR_REGISTRY=${ACR_REGISTRY}
             ACR_NAMESPACE=${ACR_NAMESPACE}
             IMAGE_TAG=${IMAGE_TAG}
+            FRONT_HTTP_PORT=${FRONT_HTTP_PORT:-8080}
             EOF
 
             echo "===> Docker login ACR"
