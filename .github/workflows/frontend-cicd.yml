@@ -60,12 +60,14 @@ jobs:
           ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
           ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
           IMAGE_TAG: ${{ github.sha }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         with:
           host: ${{ secrets.ECS_HOST }}
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG
+          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD
           script: |
             set -euo pipefail
             echo "===> Prepare /opt/goodface-fronted"
@@ -82,10 +84,10 @@ jobs:
             echo "===> Tree (before flatten)"
             ls -la
 
-            # 若仍存在 dist 子目录，扁平化到根目录
+            # 若仍存在 dist 子目录，扁平化到根目录（不要 --delete，避免源目录被删除）
             if [ -d dist ]; then
               echo "===> Flatten dist to root"
-              sudo rsync -a --delete dist/ .
+              sudo rsync -a dist/ .
               sudo rm -rf dist
             fi
 
@@ -103,6 +105,9 @@ jobs:
             ACR_NAMESPACE=${ACR_NAMESPACE}
             IMAGE_TAG=${IMAGE_TAG}
             EOF
+
+            echo "===> Docker login ACR"
+            echo "${ACR_PASSWORD}" | sudo docker login "${ACR_REGISTRY}" -u "${ACR_USERNAME}" --password-stdin
 
             echo "===> Detect docker compose"
             if docker compose version >/dev/null 2>&1; then
