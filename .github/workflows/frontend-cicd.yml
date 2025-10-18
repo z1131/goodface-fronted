@@ -1,0 +1,64 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare frontend artifacts
+        run: |
+          set -e
+          mkdir -p dist/html
+          # 将仓库根目录（排除内部目录）同步到 dist/html
+          rsync -av --delete \
+            --exclude='.DS_Store' \
+            --exclude='.github' \
+            --exclude='deploy' \
+            --exclude='dist' \
+            ./ dist/html/
+          # 附带部署模板
+          cp deploy/nginx.conf dist/nginx.conf
+          cp deploy/docker-compose.yml dist/docker-compose.yml
+
+      - name: Ensure remote directory exists
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          port: ${{ secrets.ECS_PORT }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          script: |
+            set -e
+            sudo mkdir -p /opt/goodface-web/html
+
+      - name: Upload artifacts to ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          port: ${{ secrets.ECS_PORT }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          source: "dist/*"
+          target: "/opt/goodface-web/"
+          overwrite: true
+
+      - name: Deploy Nginx via Docker Compose
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          port: ${{ secrets.ECS_PORT }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/goodface-web
+            docker compose up -d --remove-orphans
+            docker compose exec -T web nginx -t
+            docker compose exec -T web nginx -s reload || docker compose restart web
