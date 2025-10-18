@@ -20,6 +20,7 @@ jobs:
           rsync -av --delete \
             --exclude='.DS_Store' \
             --exclude='.github' \
+            --exclude='.git' \
             --exclude='deploy' \
             --exclude='dist' \
             ./ dist/html/
@@ -36,7 +37,7 @@ jobs:
           key: ${{ secrets.ECS_SSH_KEY }}
           script: |
             set -e
-            sudo mkdir -p /tmp/goodface-fronted/html
+            sudo mkdir -p /tmp/goodface-fronted
             sudo rm -rf /tmp/goodface-fronted/* || true
 
       - name: Upload artifacts to ECS (to /tmp)
@@ -46,7 +47,7 @@ jobs:
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          source: "dist/*"
+          source: "dist"
           target: "/tmp/goodface-fronted/"
           overwrite: true
 
@@ -61,8 +62,12 @@ jobs:
           script: |
             set -e
             sudo mkdir -p /opt/goodface-fronted
-            # 同步并清理临时目录
-            sudo rsync -av --delete /tmp/goodface-fronted/ /opt/goodface-fronted/
+            # 识别上传根目录（dist）并同步到 /opt
+            SRC="/tmp/goodface-fronted/dist"
+            if [ ! -d "$SRC" ]; then
+              SRC="/tmp/goodface-fronted"
+            fi
+            sudo rsync -av --delete "$SRC/" /opt/goodface-fronted/
             sudo rm -rf /tmp/goodface-fronted
 
             cd /opt/goodface-fronted
