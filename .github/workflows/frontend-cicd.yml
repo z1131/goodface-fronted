@@ -27,7 +27,7 @@ jobs:
           cp deploy/nginx.conf dist/nginx.conf
           cp deploy/docker-compose.yml dist/docker-compose.yml
 
-      - name: Ensure remote directory exists
+      - name: Ensure remote staging directory exists (/tmp)
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.ECS_HOST }}
@@ -36,9 +36,10 @@ jobs:
           key: ${{ secrets.ECS_SSH_KEY }}
           script: |
             set -e
-            sudo mkdir -p /opt/goodface-web/html
+            sudo mkdir -p /tmp/goodface-fronted/html
+            sudo rm -rf /tmp/goodface-fronted/* || true
 
-      - name: Upload artifacts to ECS
+      - name: Upload artifacts to ECS (to /tmp)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.ECS_HOST }}
@@ -46,19 +47,38 @@ jobs:
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
           source: "dist/*"
-          target: "/opt/goodface-web/"
+          target: "/tmp/goodface-fronted/"
           overwrite: true
 
-      - name: Deploy Nginx via Docker Compose
+      - name: Deploy Nginx via Docker Compose to /opt/goodface-fronted
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.ECS_HOST }}
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
+          command_timeout: 600s
           script: |
             set -e
-            cd /opt/goodface-web
-            docker compose up -d --remove-orphans
-            docker compose exec -T web nginx -t
-            docker compose exec -T web nginx -s reload || docker compose restart web
+            sudo mkdir -p /opt/goodface-fronted
+            # 同步并清理临时目录
+            sudo rsync -av --delete /tmp/goodface-fronted/ /opt/goodface-fronted/
+            sudo rm -rf /tmp/goodface-fronted
+
+            cd /opt/goodface-fronted
+            ls -la
+            if [ ! -f docker-compose.yml ]; then
+              echo "ERROR: missing docker-compose.yml in /opt/goodface-fronted" >&2
+              exit 1
+            fi
+
+            # 兼容 docker compose v2 与旧版 docker-compose
+            if command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE_CMD="sudo docker-compose -f docker-compose.yml"
+            else
+              COMPOSE_CMD="sudo docker compose -f docker-compose.yml"
+            fi
+
+            $COMPOSE_CMD up -d --remove-orphans
+            $COMPOSE_CMD exec -T goodface-fronted nginx -t
+            $COMPOSE_CMD exec -T goodface-fronted nginx -s reload || $COMPOSE_CMD restart goodface-fronted
