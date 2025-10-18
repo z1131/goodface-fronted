@@ -1,6 +1,6 @@
 services:
   goodface-fronted:
-    image: nginx:1.25-alpine
+    image: registry.cn-hangzhou.aliyuncs.com/library/nginx:1.25-alpine
     container_name: goodface-fronted
     restart: always
     ports:
