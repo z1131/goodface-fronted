@@ -134,25 +134,46 @@ function initWebSocket() {
     } catch (e) {
         console.warn('interviewSession解析失败，将使用默认连接', e);
     }
+
+    // 规范化 wsUrl：
+    // - 如果是相对路径，以当前页面域名补齐并选择 ws/wss
+    // - 如果是旧的 127.0.0.1/localhost，替换为当前页面域名
+    try {
+        if (wsUrl) {
+            const scheme = (location.protocol === 'https:' ? 'wss' : 'ws');
+            if (wsUrl.startsWith('/')) {
+                wsUrl = `${scheme}://${location.host}${wsUrl}`;
+            } else {
+                const u = new URL(wsUrl);
+                if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') {
+                    wsUrl = `${scheme}://${location.host}${u.pathname}${u.search}`;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('wsUrl 标准化失败，使用原值', e);
+    }
+
     // 没有有效的会话信息，返回配置页重新创建会话
     if (!wsUrl || !sessionId) {
         alert('未找到有效会话，请返回配置页重新开始面试。');
         window.location.href = 'config.html';
         return;
     }
+
     // 创建WebSocket连接
     webSocket = new WebSocket(wsUrl);
-    
+
     // 连接打开事件
     webSocket.onopen = function(event) {
         console.log('WebSocket连接已建立');
     };
-    
+
     // 接收消息事件
     webSocket.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
-            
+
             if (data.type === 'stt_ready') {
                 // 后端准备就绪，开始录音与音频发送
                 sttReady = true;
@@ -198,12 +219,12 @@ function initWebSocket() {
             console.error('解析WebSocket消息时出错:', e);
         }
     };
-    
+
     // 连接关闭事件
     webSocket.onclose = function(event) {
         console.log('WebSocket连接已关闭');
     };
-    
+
     // 连接错误事件
     webSocket.onerror = function(error) {
         console.error('WebSocket错误:', error);
