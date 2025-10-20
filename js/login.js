@@ -78,17 +78,22 @@ function handleGuestLogin() {
     return;
   }
 
-  // 真实后端登录
+  // 真实后端登录（失败兜底为前端游客模式）
   fetch(BACKEND_BASE_URL + '/api/user/guest/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
-  }).then(r => r.json()).then(res => {
-    if (res.success) {
+  })
+  .then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(res => {
+    if (res && res.success) {
       const user = {
-        username: res.username,
-        email: res.email,
+        username: res.username || '游客',
+        email: res.email || 'guest@example.com',
         token: res.token || null, // 后端不下发 token 时为未登录态
-        balance: res.balance,
+        balance: res.balance || '0.00',
         membership: res.membership || '游客',
         role: res.role || 'guest',
         capabilities: res.capabilities || ['basic']
@@ -97,11 +102,35 @@ function handleGuestLogin() {
       alert('已进入游客模式（功能受限）');
       window.location.href = 'config.html';
     } else {
-      alert(res.message || '登录失败');
+      // 后端未实现或返回失败，前端兜底进入游客模式
+      const user = {
+        username: '游客',
+        email: 'guest@example.com',
+        token: null,
+        balance: '0.00',
+        membership: '游客',
+        role: 'guest',
+        capabilities: ['basic']
+      };
+      localStorage.setItem('interviewUser', JSON.stringify(user));
+      alert('后端未提供游客登录，已进入游客模式');
+      window.location.href = 'config.html';
     }
-  }).catch(err => {
-    console.error('登录错误:', err);
-    alert('登录失败，请稍后重试');
+  })
+  .catch(err => {
+    console.error('游客登录接口不可用，前端进入游客模式：', err);
+    const user = {
+      username: '游客',
+      email: 'guest@example.com',
+      token: null,
+      balance: '0.00',
+      membership: '游客',
+      role: 'guest',
+      capabilities: ['basic']
+    };
+    localStorage.setItem('interviewUser', JSON.stringify(user));
+    alert('后端游客登录未开通，已进入游客模式');
+    window.location.href = 'config.html';
   });
 }
 
