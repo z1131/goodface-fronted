@@ -176,5 +176,5 @@ jobs:
             echo "===> Validate nginx"
             for i in {1..120}; do state=$(docker inspect -f '{{.State.Running}}' goodface-fronted 2>/dev/null || true); [ "$state" = "true" ] && break; sleep 1; done
             docker inspect -f '{{.State.Running}}' goodface-fronted | grep -q true || { echo '::error::container not running after 120s'; docker logs --tail=200 goodface-fronted; exit 1; }
-            docker exec -T goodface-fronted nginx -t || { docker logs --tail=200 goodface-fronted; exit 1; }
-            docker exec -T goodface-fronted nginx -s reload || docker restart goodface-fronted
+            docker exec goodface-fronted nginx -t || { docker logs --tail=200 goodface-fronted; exit 1; }
+            docker exec goodface-fronted nginx -s reload || docker restart goodface-fronted
