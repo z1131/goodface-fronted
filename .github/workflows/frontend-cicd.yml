@@ -132,12 +132,8 @@ jobs:
 
             if [ -n "${FRONT_SSL_CERT}" ] && [ -n "${FRONT_SSL_KEY}" ]; then
               echo "[deploy] Writing certs from GitHub Secrets"
-              sudo tee "$CERT" >/dev/null <<'CRT'
-${FRONT_SSL_CERT}
-CRT
-              sudo tee "$KEY" >/dev/null <<'KEY'
-${FRONT_SSL_KEY}
-KEY
+              sudo bash -c "printf '%s' \"$FRONT_SSL_CERT\" > \"$CERT\""
+              sudo bash -c "printf '%s' \"$FRONT_SSL_KEY\" > \"$KEY\""
               sudo chmod 644 "$CERT" "$KEY"
             else
               if [ ! -s "$CERT" ] || [ ! -s "$KEY" ]; then
