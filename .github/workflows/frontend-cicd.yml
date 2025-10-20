@@ -63,12 +63,13 @@ jobs:
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           FRONT_HTTP_PORT: ${{ secrets.FRONT_HTTP_PORT }}
+          FRONT_HTTPS_PORT: ${{ secrets.FRONT_HTTPS_PORT }}
         with:
           host: ${{ secrets.ECS_HOST }}
           port: ${{ secrets.ECS_PORT }}
           username: ${{ secrets.ECS_USER }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD,FRONT_HTTP_PORT
+          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD,FRONT_HTTP_PORT,FRONT_HTTPS_PORT
           script: |
             set -euo pipefail
             echo "===> Prepare /opt/goodface-fronted"
@@ -106,6 +107,7 @@ jobs:
             ACR_NAMESPACE=${ACR_NAMESPACE}
             IMAGE_TAG=${IMAGE_TAG}
             FRONT_HTTP_PORT=${FRONT_HTTP_PORT:-8080}
+            FRONT_HTTPS_PORT=${FRONT_HTTPS_PORT:-8443}
             EOF
 
             echo "===> Docker login ACR"
@@ -120,6 +122,48 @@ jobs:
               echo "ERROR: docker compose not installed" && exit 1
             fi
 
+            echo "===> Prepare TLS certs"
+            sudo mkdir -p /opt/goodface-fronted/certs
+            CERT="/opt/goodface-fronted/certs/server.crt"
+            KEY="/opt/goodface-fronted/certs/server.key"
+
+            if [ -n "${{ secrets.FRONT_SSL_CERT }}" ] && [ -n "${{ secrets.FRONT_SSL_KEY }}" ]; then
+              echo "[deploy] Writing certs from GitHub Secrets"
+              sudo tee "$CERT" >/dev/null <<'CRT'
+${{ secrets.FRONT_SSL_CERT }}
+CRT
+              sudo tee "$KEY" >/dev/null <<'KEY'
+${{ secrets.FRONT_SSL_KEY }}
+KEY
+              sudo chmod 644 "$CERT" "$KEY"
+            else
+              if [ ! -s "$CERT" ] || [ ! -s "$KEY" ]; then
+                echo "[deploy] Generating self-signed cert (fallback)"
+                CN='${{ secrets.FRONT_SSL_CN }}'; CN=${CN:-interview.zzhper.cn}
+                if command -v openssl >/dev/null 2>&1; then
+                  sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                    -keyout "$KEY" -out "$CERT" \
+                    -subj "/C=CN/ST=Hangzhou/L=Hangzhou/O=GOODFACE/OU=FE/CN=${CN}" >/dev/null 2>&1
+                  sudo chmod 644 "$CERT" "$KEY"
+                else
+                  echo "::error::OpenSSL not found and no secrets provided; cannot prepare TLS certs"
+                  ls -la /opt/goodface-fronted/certs || true
+                  exit 1
+                fi
+              fi
+            fi
+
+            echo "===> Preflight certs"
+            ls -la /opt/goodface-fronted/certs || true
+            wc -c "$CERT" "$KEY" || true
+            if [ ! -s "$CERT" ] || [ ! -s "$KEY" ]; then
+              echo "::error::TLS cert files missing or empty at /opt/goodface-fronted/certs"
+              exit 1
+            fi
+
+            echo "===> Ensure docker network"
+            sudo docker network create goodface-net || true
+
             echo "===> Compose pull & up"
             if echo "$COMPOSE_CMD" | grep -q 'docker compose'; then
               $COMPOSE_CMD --env-file .env -f docker-compose.yml pull
@@ -131,5 +175,7 @@ jobs:
             fi
 
             echo "===> Validate nginx"
-            docker exec goodface-fronted nginx -t
-            docker exec goodface-fronted nginx -s reload || docker restart goodface-fronted
+            for i in {1..120}; do state=$(docker inspect -f '{{.State.Running}}' goodface-fronted 2>/dev/null || true); [ "$state" = "true" ] && break; sleep 1; done
+            docker inspect -f '{{.State.Running}}' goodface-fronted | grep -q true || { echo '::error::container not running after 120s'; docker logs --tail=200 goodface-fronted; exit 1; }
+            docker exec -T goodface-fronted nginx -t || { docker logs --tail=200 goodface-fronted; exit 1; }
+            docker exec -T goodface-fronted nginx -s reload || docker restart goodface-fronted
