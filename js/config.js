@@ -467,8 +467,28 @@ function handleRegister() {
     });
 }
 
+// 预请求麦克风权限：在用户点击“开始面试”时触发（满足Safari等浏览器的用户手势要求）
+async function ensureMicPermission() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // 立即停止测试流，后续真正录音由 interview.js 在 stt_ready 后开启
+        stream.getTracks().forEach(t => t.stop());
+        console.log('麦克风权限已获取');
+        return true;
+    } catch (err) {
+        console.warn('麦克风权限请求失败:', err);
+        const isSecure = (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+        if (!isSecure) {
+            alert('麦克风权限请求失败：请使用 HTTPS 访问或通过 localhost/127.0.0.1。');
+        } else {
+            alert('麦克风权限请求失败：请在浏览器地址栏允许麦克风访问，并检查系统隐私设置。');
+        }
+        return false;
+    }
+}
+
 // 开始面试
-function startInterview() {
+async function startInterview() {
     const model = document.getElementById('model') ? document.getElementById('model').value : '';
     const prompt = document.getElementById('prompt') ? document.getElementById('prompt').value.trim() : '';
     
@@ -477,7 +497,11 @@ function startInterview() {
         alert('请填写所有必填字段');
         return;
     }
-    
+
+    // 先请求麦克风权限（用户手势触发）
+    const micOk = await ensureMicPermission();
+    if (!micOk) return;
+
     // 检查是否选择了需要登录的模型但未登录（基于返回的 requiresAuth）
     const user = safeGetUser();
     const selected = modelSelect && modelSelect.selectedIndex >= 0 ? modelSelect.options[modelSelect.selectedIndex] : null;
