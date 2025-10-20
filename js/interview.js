@@ -40,6 +40,8 @@ function updateTimerDisplay() {
 }
 
 function startTimer() {
+    // 如果页面上没有计时器元素，直接不启动定时器
+    if (!timerDisplay) return;
     if (timerRunning) return;
     timerRunning = true;
     const base = Date.now() - elapsedMs;
@@ -106,9 +108,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 绑定事件
 function bindEvents() {
-    // 暂停/恢复面试
-    pauseInterviewBtn.addEventListener('click', togglePause);
-    
     // 结束面试
     endInterviewBtn.addEventListener('click', endInterview);
 }
