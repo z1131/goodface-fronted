@@ -376,7 +376,7 @@ function handleSendCode() {
     }, 1000);
     
     // 发送请求
-    fetch('http://127.0.0.1:8081/api/user/sendCode', {
+    fetch('/api/user/sms/code', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -422,7 +422,7 @@ function handleRegister() {
     }
     
     // 发送注册请求
-    fetch('http://127.0.0.1:8081/api/user/register', {
+    fetch('/api/user/register', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

@@ -23,6 +23,16 @@ let processorNode; // 处理节点（ScriptProcessor）
 let sttReady = false; // 收到后端就绪信号后才发送音频
 let recordingStarted = false; // 避免重复启动录音
 
+// WebSocket连接健壮性相关变量
+let heartbeatInterval = null; // 心跳定时器
+let reconnectAttempts = 0; // 重连尝试次数
+let maxReconnectAttempts = 10; // 最大重连次数
+let reconnectDelay = 1000; // 初始重连延迟（毫秒）
+let maxReconnectDelay = 30000; // 最大重连延迟（毫秒）
+let isReconnecting = false; // 是否正在重连
+let wsUrl = null; // 保存WebSocket URL用于重连
+let isManualClose = false; // 是否手动关闭连接
+
 // 计时器相关变量
 let timerInterval = null;
 let elapsedMs = 0;
@@ -122,7 +132,6 @@ function initWebSocket() {
     }
 
     // 正常模式：使用portal下发的wsUrl与sessionId
-    let wsUrl;
     try {
         const raw = localStorage.getItem('interviewSession');
         const sess = raw ? JSON.parse(raw) : null;
@@ -160,74 +169,12 @@ function initWebSocket() {
         return;
     }
 
-    // 创建WebSocket连接
-    webSocket = new WebSocket(wsUrl);
-
-    // 连接打开事件
-    webSocket.onopen = function(event) {
-        console.log('WebSocket连接已建立');
-    };
-
-    // 接收消息事件
-    webSocket.onmessage = function(event) {
-        try {
-            const data = JSON.parse(event.data);
-
-            if (data.type === 'stt_ready') {
-                // 后端准备就绪，开始录音与音频发送
-                sttReady = true;
-                if (!recordingStarted) {
-                    startRecording();
-                }
-                return;
-            }
-
-            if (data.type === 'stt_partial') {
-                // 新流程：不展示 STT 文本，仅在识别出新问题后展示
-                return;
-            }
-
-            if (data.type === 'stt_final') {
-                // 新流程：不展示 STT 最终文本，改由后端推送 question
-                return;
-            }
-
-            if (data.type === 'question') {
-                // 收到新问题：清空旧答案并重置缓冲
-                try {
-                    answerDisplay.innerHTML = '';
-                    answerBuffer = '';
-                    answerStarted = false;
-                } catch (e) { console.warn('清空旧答案失败:', e); }
-
-                displayQuestion(data.content);
-                // 不再展示侧栏候选问题
-            } else if (data.type === 'answer') {
-                if (data.content === '[END]') {
-                    const endTag = document.createElement('p');
-                    endTag.style.color = '#27ae60';
-                    endTag.textContent = '[回答结束]';
-                    answerDisplay.appendChild(endTag);
-                    answerStarted = false;
-                    // 保持最终内容已渲染，无需追加操作
-                } else if (typeof data.content === 'string' && data.content.length > 0) {
-                    appendAnswerChunk(data.content);
-                }
-            }
-        } catch (e) {
-            console.error('解析WebSocket消息时出错:', e);
-        }
-    };
-
-    // 连接关闭事件
-    webSocket.onclose = function(event) {
-        console.log('WebSocket连接已关闭');
-    };
-
-    // 连接错误事件
-    webSocket.onerror = function(error) {
-        console.error('WebSocket错误:', error);
-    };
+    // 重置连接状态
+    isManualClose = false;
+    resetReconnectState();
+    
+    // 使用新的连接函数
+    createWebSocketConnection();
 }
 
 // 开始录音（改为发送 PCM 16kHz/mono/Int16 二进制）
@@ -348,6 +295,12 @@ function appendAnswerChunk(text) {
 
 // 结束面试
 function endInterview() {
+    // 标记为手动关闭，避免重连
+    isManualClose = true;
+    
+    // 停止心跳
+    stopHeartbeat();
+    
     // 停止音频链路
     try {
         if (processorNode) {
@@ -380,10 +333,207 @@ function endInterview() {
 
 // 页面卸载前检查
 window.addEventListener('beforeunload', function(e) {
-    // 如果正在录音，提示用户
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    // 标记为手动关闭
+    isManualClose = true;
+    
+    // 停止心跳
+    stopHeartbeat();
+    
+    // 关闭WebSocket连接
+    if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+        webSocket.close();
+    }
+    
+    // 停止录音
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+    }
+    
+    // 浏览器可能会显示确认对话框
+    if (!isPreview) {
+        const message = '确定要离开面试页面吗？面试进度将会丢失。';
         e.preventDefault();
-        e.returnValue = '您正在录音，确定要离开页面吗？';
-        return e.returnValue;
+        return e.returnValue = message;
     }
 });
+function startHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+    }
+    
+    heartbeatInterval = setInterval(() => {
+        if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+            try {
+                // 发送心跳ping消息
+                webSocket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                console.log('发送心跳ping');
+            } catch (error) {
+                console.error('发送心跳失败:', error);
+            }
+        }
+    }, 30000); // 每30秒发送一次心跳
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
+}
+
+// WebSocket重连机制
+function reconnectWebSocket() {
+    if (isReconnecting || isManualClose) {
+        return;
+    }
+    
+    if (reconnectAttempts >= maxReconnectAttempts) {
+        console.error('达到最大重连次数，停止重连');
+        alert('连接已断开且无法重连，请刷新页面重试');
+        return;
+    }
+    
+    isReconnecting = true;
+    reconnectAttempts++;
+    
+    // 计算指数退避延迟
+    const delay = Math.min(reconnectDelay * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay);
+    
+    console.log(`第${reconnectAttempts}次重连尝试，${delay}ms后开始...`);
+    
+    setTimeout(() => {
+        if (!isManualClose) {
+            console.log('开始重连WebSocket...');
+            createWebSocketConnection();
+        }
+        isReconnecting = false;
+    }, delay);
+}
+
+// 重置重连状态
+function resetReconnectState() {
+    reconnectAttempts = 0;
+    isReconnecting = false;
+}
+
+// 创建WebSocket连接
+function createWebSocketConnection() {
+    if (!wsUrl || !sessionId) {
+        console.error('缺少wsUrl或sessionId，无法建立连接');
+        return;
+    }
+    
+    // 关闭现有连接
+    if (webSocket) {
+        webSocket.onclose = null;
+        webSocket.onerror = null;
+        webSocket.close();
+    }
+    
+    try {
+        // 在URL中添加重连标识和sessionId
+        const reconnectUrl = wsUrl + (wsUrl.includes('?') ? '&' : '?') + 
+                           `reconnect=${reconnectAttempts > 0 ? 'true' : 'false'}&sessionId=${sessionId}`;
+        
+        webSocket = new WebSocket(reconnectUrl);
+        
+        // 连接打开事件
+        webSocket.onopen = function(event) {
+            console.log('WebSocket连接已建立');
+            resetReconnectState();
+            startHeartbeat();
+            
+            // 如果是重连，需要重新初始化录音
+            if (reconnectAttempts > 0 && !recordingStarted) {
+                sttReady = false; // 重置STT状态，等待新的stt_ready信号
+            }
+        };
+        
+        // 接收消息事件
+        webSocket.onmessage = function(event) {
+            try {
+                // 处理二进制消息（可能是音频数据的响应）
+                if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+                    console.log('收到二进制消息');
+                    return;
+                }
+                
+                const data = JSON.parse(event.data);
+                
+                // 处理心跳响应
+                if (data.type === 'pong') {
+                    console.log('收到心跳pong响应');
+                    return;
+                }
+                
+                if (data.type === 'stt_ready') {
+                    // 后端准备就绪，开始录音与音频发送
+                    sttReady = true;
+                    if (!recordingStarted) {
+                        startRecording();
+                    }
+                    return;
+                }
+                
+                if (data.type === 'stt_partial') {
+                    // 新流程：不展示 STT 文本，仅在识别出新问题后展示
+                    return;
+                }
+                
+                if (data.type === 'stt_final') {
+                    // 新流程：不展示 STT 最终文本，改由后端推送 question
+                    return;
+                }
+                
+                if (data.type === 'question') {
+                    // 收到新问题：清空旧答案并重置缓冲
+                    try {
+                        answerDisplay.innerHTML = '';
+                        answerBuffer = '';
+                        answerStarted = false;
+                    } catch (e) { console.warn('清空旧答案失败:', e); }
+                    
+                    displayQuestion(data.content);
+                    // 不再展示侧栏候选问题
+                } else if (data.type === 'answer') {
+                    if (data.content === '[END]') {
+                        const endTag = document.createElement('p');
+                        endTag.style.color = '#27ae60';
+                        endTag.textContent = '[回答结束]';
+                        answerDisplay.appendChild(endTag);
+                        answerStarted = false;
+                        // 保持最终内容已渲染，无需追加操作
+                    } else if (typeof data.content === 'string' && data.content.length > 0) {
+                        appendAnswerChunk(data.content);
+                    }
+                }
+            } catch (e) {
+                console.error('解析WebSocket消息时出错:', e);
+            }
+        };
+        
+        // 连接关闭事件
+        webSocket.onclose = function(event) {
+            console.log('WebSocket连接已关闭', event.code, event.reason);
+            stopHeartbeat();
+            
+            // 如果不是手动关闭，尝试重连
+            if (!isManualClose && !isPreview) {
+                console.log('连接意外关闭，准备重连...');
+                reconnectWebSocket();
+            }
+        };
+        
+        // 连接错误事件
+        webSocket.onerror = function(error) {
+            console.error('WebSocket错误:', error);
+            stopHeartbeat();
+        };
+        
+    } catch (error) {
+        console.error('创建WebSocket连接失败:', error);
+        if (!isManualClose) {
+            reconnectWebSocket();
+        }
+    }
+}

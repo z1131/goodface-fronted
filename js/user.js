@@ -319,7 +319,7 @@ function handlePhoneLogin() {
     }
     
     // 发送登录请求（如失败则走开发态本地校验）
-    fetch('http://127.0.0.1:8081/api/user/loginByCode', {
+    fetch('/api/user/loginByCode', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -438,7 +438,7 @@ function handleSendCode() {
     }, 1000);
     
     // 发送请求（如失败则走开发态本地生成验证码）
-    fetch('http://127.0.0.1:8081/api/user/sendCode', {
+    fetch('/api/user/sms/code', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -511,7 +511,7 @@ function handleRegister() {
     }
     
     // 发送注册请求
-    fetch('http://127.0.0.1:8081/api/user/register', {
+    fetch('/api/user/register', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
