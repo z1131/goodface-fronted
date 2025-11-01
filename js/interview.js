@@ -19,9 +19,11 @@ let sessionId; // 会话ID
 let isPaused = false; // 面试暂停状态
 let audioCtx; // 音频上下文（16kHz）
 let sourceNode; // 媒体源节点
-let processorNode; // 处理节点（ScriptProcessor）
+let processorNode; // 处理节点（ScriptProcessor或AudioWorkletNode）
+let audioWorkletNode; // AudioWorklet节点
 let sttReady = false; // 收到后端就绪信号后才发送音频
 let recordingStarted = false; // 避免重复启动录音
+let useAudioWorklet = false; // 是否使用AudioWorklet
 
 // WebSocket连接健壮性相关变量
 let heartbeatInterval = null; // 心跳定时器
@@ -177,7 +179,7 @@ function initWebSocket() {
     createWebSocketConnection();
 }
 
-// 开始录音（改为发送 PCM 16kHz/mono/Int16 二进制）
+// 开始录音（支持AudioWorklet和ScriptProcessor降级）
 async function startRecording() {
     try {
         // 获取用户媒体权限
@@ -187,47 +189,101 @@ async function startRecording() {
         const AC = window.AudioContext || window.webkitAudioContext;
         audioCtx = new AC({ sampleRate: 16000 });
 
-        // 媒体源与处理器节点
+        // 媒体源节点
         sourceNode = audioCtx.createMediaStreamSource(mediaStream);
-        // ScriptProcessorNode：缓冲大小2048，单声道
-        processorNode = audioCtx.createScriptProcessor(2048, 1, 1);
 
-        processorNode.onaudioprocess = (event) => {
-            // 仅在收到 stt_ready 后开始发送音频
-            if (!sttReady || isPaused || !webSocket || webSocket.readyState !== WebSocket.OPEN) return;
-            const input = event.inputBuffer.getChannelData(0); // Float32Array [-1,1]
-            const inRate = audioCtx.sampleRate || 16000;
-            let floatData;
-            if (inRate === 16000) {
-                floatData = input;
-            } else {
-                // 简单下采样至16k：抽取法（近似）。如需更高质量可改用低通滤波。
-                const ratio = inRate / 16000;
-                const outLen = Math.floor(input.length / ratio);
-                floatData = new Float32Array(outLen);
-                for (let j = 0; j < outLen; j++) {
-                    floatData[j] = input[Math.floor(j * ratio)] || 0;
-                }
-            }
-            // Float32 → PCM Int16LE
-            const pcm16 = new Int16Array(floatData.length);
-            for (let i = 0; i < floatData.length; i++) {
-                let s = Math.max(-1, Math.min(1, floatData[i]));
-                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-            }
-            webSocket.send(new Uint8Array(pcm16.buffer));
-        };
-
-        // 连接音频图（ScriptProcessor 需连接到 destination 才能触发）
-        sourceNode.connect(processorNode);
-        processorNode.connect(audioCtx.destination);
+        // 尝试使用AudioWorklet，失败则降级到ScriptProcessor
+        try {
+            await initAudioWorklet();
+        } catch (workletError) {
+            console.warn('AudioWorklet不可用，降级到ScriptProcessor:', workletError);
+            initScriptProcessor();
+        }
 
         recordingStarted = true;
-        console.log('录音（PCM 16kHz）已开始；将于收到 stt_ready 后发送');
+        console.log(`录音（PCM 16kHz）已开始，使用${useAudioWorklet ? 'AudioWorklet' : 'ScriptProcessor'}；将于收到 stt_ready 后发送`);
     } catch (error) {
         console.error('无法访问麦克风:', error);
         alert('无法访问麦克风，请检查权限设置');
     }
+}
+
+// 初始化AudioWorklet
+async function initAudioWorklet() {
+    // 检查AudioWorklet支持
+    if (!audioCtx.audioWorklet) {
+        throw new Error('AudioWorklet not supported');
+    }
+
+    // 加载AudioWorklet模块
+    await audioCtx.audioWorklet.addModule('js/audio-worklet-processor.js');
+
+    // 创建AudioWorkletNode
+    audioWorkletNode = new AudioWorkletNode(audioCtx, 'audio-stream-processor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1
+    });
+
+    // 配置采样率
+    audioWorkletNode.port.postMessage({
+        type: 'config',
+        sampleRate: 16000
+    });
+
+    // 监听音频数据
+    audioWorkletNode.port.onmessage = (event) => {
+        if (event.data.type === 'audioData') {
+            // 仅在收到 stt_ready 后开始发送音频
+            if (sttReady && !isPaused && webSocket && webSocket.readyState === WebSocket.OPEN) {
+                webSocket.send(new Uint8Array(event.data.data));
+            }
+        }
+    };
+
+    // 连接音频图
+    sourceNode.connect(audioWorkletNode);
+    useAudioWorklet = true;
+}
+
+// 初始化ScriptProcessor（降级方案）
+function initScriptProcessor() {
+    // ScriptProcessorNode：缓冲大小2048，单声道
+    processorNode = audioCtx.createScriptProcessor(2048, 1, 1);
+
+    processorNode.onaudioprocess = (event) => {
+        // 仅在收到 stt_ready 后开始发送音频
+        if (!sttReady || isPaused || !webSocket || webSocket.readyState !== WebSocket.OPEN) return;
+        
+        const input = event.inputBuffer.getChannelData(0); // Float32Array [-1,1]
+        const inRate = audioCtx.sampleRate || 16000;
+        let floatData;
+        
+        if (inRate === 16000) {
+            floatData = input;
+        } else {
+            // 简单下采样至16k：抽取法（近似）
+            const ratio = inRate / 16000;
+            const outLen = Math.floor(input.length / ratio);
+            floatData = new Float32Array(outLen);
+            for (let j = 0; j < outLen; j++) {
+                floatData[j] = input[Math.floor(j * ratio)] || 0;
+            }
+        }
+        
+        // Float32 → PCM Int16LE
+        const pcm16 = new Int16Array(floatData.length);
+        for (let i = 0; i < floatData.length; i++) {
+            let s = Math.max(-1, Math.min(1, floatData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        webSocket.send(new Uint8Array(pcm16.buffer));
+    };
+
+    // 连接音频图（ScriptProcessor 需连接到 destination 才能触发）
+    sourceNode.connect(processorNode);
+    processorNode.connect(audioCtx.destination);
+    useAudioWorklet = false;
 }
 
 // 暂停/恢复面试
@@ -301,34 +357,42 @@ function endInterview() {
     // 停止心跳
     stopHeartbeat();
     
-    // 停止音频链路
-    try {
-        if (processorNode) {
-            processorNode.disconnect();
-            processorNode.onaudioprocess = null;
-        }
-        if (sourceNode) sourceNode.disconnect();
-        if (audioCtx) audioCtx.close();
-        if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
-    } catch (e) {
-        console.warn('停止音频失败:', e);
+    // 停止计时器
+    stopTimer();
+    
+    // 停止录音
+    if (useAudioWorklet && audioWorkletNode) {
+        audioWorkletNode.disconnect();
+        audioWorkletNode = null;
+    } else if (processorNode) {
+        processorNode.disconnect();
+        processorNode = null;
+    }
+    
+    if (sourceNode) {
+        sourceNode.disconnect();
+        sourceNode = null;
+    }
+    if (audioCtx) {
+        audioCtx.close();
+        audioCtx = null;
+    }
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
     }
     
     // 关闭WebSocket连接
     if (webSocket) {
         webSocket.close();
+        webSocket = null;
     }
-    // 停止计时
-    stopTimer();
     
-    // 确认是否结束面试
-    if (confirm('确定要结束本次面试吗？')) {
-        // 清除面试配置
-        localStorage.removeItem('interviewConfig');
-        
-        // 跳转到配置页面
-        window.location.href = 'config.html';
-    }
+    // 显示结束消息
+    alert('面试已结束，感谢您的参与！');
+    
+    // 返回配置页面
+    window.location.href = 'config.html';
 }
 
 // 页面卸载前检查
@@ -472,16 +536,6 @@ function createWebSocketConnection() {
                     if (!recordingStarted) {
                         startRecording();
                     }
-                    return;
-                }
-                
-                if (data.type === 'stt_partial') {
-                    // 新流程：不展示 STT 文本，仅在识别出新问题后展示
-                    return;
-                }
-                
-                if (data.type === 'stt_final') {
-                    // 新流程：不展示 STT 最终文本，改由后端推送 question
                     return;
                 }
                 
