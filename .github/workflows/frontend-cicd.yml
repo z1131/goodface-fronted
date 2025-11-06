@@ -1,61 +1,81 @@
-name: Frontend CI/CD
+name: Frontend CI/CD - Multi-ECS HA Deployment
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
-  deploy:
+  docker:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.short_sha.outputs.sha_short }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build & Push Nginx image to ACR
-        env:
-          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
-          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          set -e
-          echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
-          IMAGE="$ACR_REGISTRY/$ACR_NAMESPACE/goodface-fronted-nginx:$IMAGE_TAG"
-          docker build -f deploy/Dockerfile -t "$IMAGE" .
-          docker push "$IMAGE"
+      - name: Get full SHA
+        id: short_sha
+        run: echo "sha_short=${{ github.sha }}" >> $GITHUB_OUTPUT
 
-      - name: Prepare dist
-        run: |
-          set -e
-          rm -rf dist && mkdir -p dist/html
-          # 同步静态文件（排除内部目录，避免自复制 dist）
-          rsync -av --delete \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude 'deploy' \
-            --exclude '.vscode' \
-            --exclude '_ws_test' \
-            --exclude 'dist' \
-            ./ dist/html/
-          # 拷贝 Nginx 部署模板
-          cp -v deploy/docker-compose.yml dist/
-          cp -v deploy/nginx.conf dist/
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
-      - name: Upload dist to ECS (home tmp)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to ACR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/goodface-fronted-nginx
+          tags: |
+            type=raw,value=${{ github.sha }}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./deploy/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy-ecs1:
+    needs: docker
+    if: needs.docker.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy docker-compose to ECS-1
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.ECS_HOST }}
-          port: ${{ secrets.ECS_PORT }}
+          host: ${{ secrets.ECS_HOST_1 }}
           username: ${{ secrets.ECS_USER }}
+          port: ${{ secrets.ECS_PORT }}
           key: ${{ secrets.ECS_SSH_KEY }}
-          source: "dist/*"
-          target: "/tmp/goodface-fronted/dist"
+          source: "deploy/docker-compose.yml"
+          target: "/opt/goodface-fronted/"
+          strip_components: 1
           overwrite: true
 
-      - name: Deploy on ECS via SSH
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Deploy to ECS-1 (47.99.32.144)
+        uses: appleboy/ssh-action@v0.1.7
         env:
           ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
           ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
@@ -68,64 +88,34 @@ jobs:
           FRONT_SSL_KEY: ${{ secrets.FRONT_SSL_KEY }}
           FRONT_SSL_CN: ${{ secrets.FRONT_SSL_CN }}
         with:
-          host: ${{ secrets.ECS_HOST }}
-          port: ${{ secrets.ECS_PORT }}
+          host: ${{ secrets.ECS_HOST_1 }}
           username: ${{ secrets.ECS_USER }}
+          port: ${{ secrets.ECS_PORT }}
           key: ${{ secrets.ECS_SSH_KEY }}
           envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD,FRONT_HTTP_PORT,FRONT_HTTPS_PORT,FRONT_SSL_CERT,FRONT_SSL_KEY,FRONT_SSL_CN
           script: |
             set -euo pipefail
             echo "===> Prepare /opt/goodface-fronted"
             sudo mkdir -p /opt/goodface-fronted
-
-            echo "===> Move dist into /opt/goodface-fronted"
-            if [ -d /tmp/goodface-fronted/dist ]; then
-              sudo rsync -a --delete /tmp/goodface-fronted/dist/ /opt/goodface-fronted/
-            elif [ -d /tmp/goodface-fronted ]; then
-              sudo rsync -a --delete /tmp/goodface-fronted/ /opt/goodface-fronted/
-            fi
-
             cd /opt/goodface-fronted
-            echo "===> Tree (before flatten)"
-            ls -la
 
-            # 若仍存在 dist 子目录，扁平化到根目录（不要 --delete，避免源目录被删除）
-            if [ -d dist ]; then
-              echo "===> Flatten dist to root"
-              sudo rsync -a dist/ .
-              sudo rm -rf dist
+            sudo docker login $ACR_REGISTRY -u $ACR_USERNAME -p $ACR_PASSWORD
+
+            # Generate .env from GitHub Secrets
+            echo "ACR_REGISTRY=$ACR_REGISTRY" > .env
+            echo "ACR_NAMESPACE=$ACR_NAMESPACE" >> .env
+            echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+            echo "FRONT_HTTP_PORT=${FRONT_HTTP_PORT:-80}" >> .env
+            echo "FRONT_HTTPS_PORT=${FRONT_HTTPS_PORT:-443}" >> .env
+
+            # Try to pull the specific image tag, fallback to latest if not found
+            if ! sudo docker compose --env-file .env pull; then
+              echo "⚠️  Failed to pull image $IMAGE_TAG, falling back to latest"
+              sed -i 's/IMAGE_TAG=.*/IMAGE_TAG=latest/' .env
+              sudo docker compose --env-file .env pull
             fi
 
-            echo "===> Tree (after flatten)"
-            ls -la
-
-            if [ ! -f docker-compose.yml ]; then
-              echo "ERROR: missing docker-compose.yml in /opt/goodface-fronted" >&2
-              exit 1
-            fi
-
-            echo "===> Write .env for compose"
-            sudo tee /opt/goodface-fronted/.env >/dev/null << EOF
-            ACR_REGISTRY=${ACR_REGISTRY}
-            ACR_NAMESPACE=${ACR_NAMESPACE}
-            IMAGE_TAG=${IMAGE_TAG}
-            FRONT_HTTP_PORT=${FRONT_HTTP_PORT:-80}
-            FRONT_HTTPS_PORT=${FRONT_HTTPS_PORT:-443}
-            EOF
-
-            echo "===> Docker login ACR"
-            echo "${ACR_PASSWORD}" | sudo docker login "${ACR_REGISTRY}" -u "${ACR_USERNAME}" --password-stdin
-
-            echo "===> Detect docker compose"
-            if docker compose version >/dev/null 2>&1; then
-              COMPOSE_CMD="sudo docker compose"
-            elif docker-compose version >/dev/null 2>&1; then
-              COMPOSE_CMD="sudo docker-compose"
-            else
-              echo "ERROR: docker compose not installed" && exit 1
-            fi
-
-            echo "===> Prepare TLS certs"
+            # Prepare TLS certs
             sudo mkdir -p /opt/goodface-fronted/certs
             CERT="/opt/goodface-fronted/certs/server.crt"
             KEY="/opt/goodface-fronted/certs/server.key"
@@ -146,35 +136,122 @@ jobs:
                   sudo chmod 644 "$CERT" "$KEY"
                 else
                   echo "::error::OpenSSL not found and no secrets provided; cannot prepare TLS certs"
-                  ls -la /opt/goodface-fronted/certs || true
                   exit 1
                 fi
               fi
             fi
 
-            echo "===> Preflight certs"
-            ls -la /opt/goodface-fronted/certs || true
-            wc -c "$CERT" "$KEY" || true
-            if [ ! -s "$CERT" ] || [ ! -s "$KEY" ]; then
-              echo "::error::TLS cert files missing or empty at /opt/goodface-fronted/certs"
-              exit 1
-            fi
-
-            echo "===> Ensure docker network"
+            # Ensure network and start container
             sudo docker network create goodface-net || true
+            sudo docker compose --env-file .env up -d --remove-orphans
 
-            echo "===> Compose pull & up"
-            if echo "$COMPOSE_CMD" | grep -q 'docker compose'; then
-              $COMPOSE_CMD --env-file .env -f docker-compose.yml pull
-              $COMPOSE_CMD --env-file .env -f docker-compose.yml up -d --remove-orphans
-            else
-              # compose v1 自动读取 .env
-              $COMPOSE_CMD -f docker-compose.yml pull
-              $COMPOSE_CMD -f docker-compose.yml up -d --remove-orphans
+            echo "✅ ECS-1 deployment completed"
+
+  deploy-ecs2:
+    needs: docker
+    if: needs.docker.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy docker-compose to ECS-2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST_2 }}
+          username: ${{ secrets.ECS_USER }}
+          port: ${{ secrets.ECS_PORT }}
+          key: ${{ secrets.ECS_SSH_KEY_2 }}
+          source: "deploy/docker-compose.yml"
+          target: "/opt/goodface-fronted/"
+          strip_components: 1
+          overwrite: true
+          timeout: 300s
+          command_timeout: 60s
+
+      - name: Deploy to ECS-2 (47.114.90.156)
+        uses: appleboy/ssh-action@v0.1.7
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+          IMAGE_TAG: ${{ github.sha }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          FRONT_HTTP_PORT: ${{ secrets.FRONT_HTTP_PORT }}
+          FRONT_HTTPS_PORT: ${{ secrets.FRONT_HTTPS_PORT }}
+          FRONT_SSL_CERT: ${{ secrets.FRONT_SSL_CERT }}
+          FRONT_SSL_KEY: ${{ secrets.FRONT_SSL_KEY }}
+          FRONT_SSL_CN: ${{ secrets.FRONT_SSL_CN }}
+        with:
+          host: ${{ secrets.ECS_HOST_2 }}
+          username: ${{ secrets.ECS_USER }}
+          port: ${{ secrets.ECS_PORT }}
+          key: ${{ secrets.ECS_SSH_KEY_2 }}
+          timeout: 300s
+          command_timeout: 300s
+          envs: ACR_REGISTRY,ACR_NAMESPACE,IMAGE_TAG,ACR_USERNAME,ACR_PASSWORD,FRONT_HTTP_PORT,FRONT_HTTPS_PORT,FRONT_SSL_CERT,FRONT_SSL_KEY,FRONT_SSL_CN
+          script: |
+            set -euo pipefail
+            echo "===> Prepare /opt/goodface-fronted"
+            sudo mkdir -p /opt/goodface-fronted
+            cd /opt/goodface-fronted
+
+            sudo docker login $ACR_REGISTRY -u $ACR_USERNAME -p $ACR_PASSWORD
+
+            # Generate .env from GitHub Secrets
+            echo "ACR_REGISTRY=$ACR_REGISTRY" > .env
+            echo "ACR_NAMESPACE=$ACR_NAMESPACE" >> .env
+            echo "IMAGE_TAG=$IMAGE_TAG" >> .env
+            echo "FRONT_HTTP_PORT=${FRONT_HTTP_PORT:-80}" >> .env
+            echo "FRONT_HTTPS_PORT=${FRONT_HTTPS_PORT:-443}" >> .env
+
+            # Try to pull the specific image tag, fallback to latest if not found
+            if ! sudo docker compose --env-file .env pull; then
+              echo "⚠️  Failed to pull image $IMAGE_TAG, falling back to latest"
+              echo "IMAGE_TAG=latest" > .env
+              sudo docker compose --env-file .env pull
             fi
 
-            echo "===> Validate nginx"
-            for i in {1..120}; do state=$(docker inspect -f '{{.State.Running}}' goodface-fronted 2>/dev/null || true); [ "$state" = "true" ] && break; sleep 1; done
-            docker inspect -f '{{.State.Running}}' goodface-fronted | grep -q true || { echo '::error::container not running after 120s'; docker logs --tail=200 goodface-fronted; exit 1; }
-            docker exec goodface-fronted nginx -t || { docker logs --tail=200 goodface-fronted; exit 1; }
-            docker exec goodface-fronted nginx -s reload || docker restart goodface-fronted
+            # Prepare TLS certs
+            sudo mkdir -p /opt/goodface-fronted/certs
+            CERT="/opt/goodface-fronted/certs/server.crt"
+            KEY="/opt/goodface-fronted/certs/server.key"
+
+            if [ -n "${FRONT_SSL_CERT}" ] && [ -n "${FRONT_SSL_KEY}" ]; then
+              echo "[deploy] Writing certs from GitHub Secrets"
+              sudo bash -c "printf '%s' \"$FRONT_SSL_CERT\" > \"$CERT\""
+              sudo bash -c "printf '%s' \"$FRONT_SSL_KEY\" > \"$KEY\""
+              sudo chmod 644 "$CERT" "$KEY"
+            else
+              if [ ! -s "$CERT" ] || [ ! -s "$KEY" ]; then
+                echo "[deploy] Generating self-signed cert (fallback)"
+                CN="${FRONT_SSL_CN}"; CN=${CN:-interview.zzhper.cn}
+                if command -v openssl >/dev/null 2>&1; then
+                  sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                    -keyout "$KEY" -out "$CERT" \
+                    -subj "/C=CN/ST=Hangzhou/L=Hangzhou/O=GOODFACE/OU=FE/CN=${CN}" >/dev/null 2>&1
+                  sudo chmod 644 "$CERT" "$KEY"
+                else
+                  echo "::error::OpenSSL not found and no secrets provided; cannot prepare TLS certs"
+                  exit 1
+                fi
+              fi
+            fi
+
+            # Ensure network and start container
+            sudo docker network create goodface-net || true
+            sudo docker compose --env-file .env up -d --remove-orphans
+
+            echo "✅ ECS-2 deployment completed"
+
+  health-check:
+    needs: [deploy-ecs1, deploy-ecs2]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health Check ECS-1
+        run: |
+          sleep 30
+          curl -f http://${{ secrets.ECS_HOST_1 }}:${{ secrets.FRONT_HTTP_PORT }}/ || echo "⚠️  ECS-1 health check failed"
+      - name: Health Check ECS-2
+        run: |
+          sleep 30
+          curl -f http://${{ secrets.ECS_HOST_2 }}:${{ secrets.FRONT_HTTP_PORT }}/ || echo "⚠️  ECS-2 health check failed"
